@@ -8,8 +8,8 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 
 | # | Slice | Contents | Status |
 |---|-------|----------|--------|
-| 0 | Foundations | Docs, scaffold (Vite/React/TS/Tailwind/PWA/Vitest/ESLint) | ⏳ |
-| 1 | Language core | Pinyin lib (marks↔numbers, parsing, validation, sandhi, input normalisation), segmentation | ⏳ |
+| 0 | Foundations | Docs, scaffold (Vite/React/TS/Tailwind/PWA/Vitest/ESLint), icons, CSP | ✅ |
+| 1 | Language core | `lib/pinyin.ts` (syllables, marks, parsing any input format, sandhi, grading with initial/final/tone feedback), `lib/segment.ts` (ICU + lexicon segmentation, coverage); 26 tests | ✅ |
 | 2 | Engine core | FSRS wrapper + rating policy, mastery, Elo abilities, answer evaluation, error classification, planner, selector, progress metrics | ⏳ |
 | 3 | Seed curriculum | Units 1–14 (~300 words, chunks, ~25 grammar patterns, sentences, dialogues, stories, tones, confusables) + validation tests | ⏳ |
 | 4 | **MVP loop** | DB, onboarding → calibration → Learn Now session → exercises → evaluation → mastery/SRS update → dashboard → next session | ⏳ |
@@ -50,3 +50,4 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 ## Changelog
 
 - 2026-10-04 — Project started. Docs written.
+- 2026-10-04 — Slice 0–1 done. Adopted ponytail engineering style: consolidated the pinyin library from 7 files to 1, replaced a hand-rolled bidirectional segmenter with native `Intl.Segmenter` + lexicon split, deleted unused helpers. Content validation (pinyin-pro cross-check) moves to slice 3 where curated data exists.

@@ -62,26 +62,24 @@ There is **no backend**. Operating cost is $0 unless the learner configures a pa
 
 ## 3. Directory layout
 
+Engineering style is **ponytail** (YAGNI, reuse before writing, stdlib/native before dependencies,
+fewest files, no single-implementation abstractions unless the spec asks for one). Deliberate
+shortcuts carry a `// ponytail: <ceiling>, <upgrade path>` comment so they can be harvested into a
+debt ledger instead of rotting. Modules are single files until they genuinely outgrow it.
+
 ```
 src/
-  main.tsx, App.tsx, router.ts         app shell + tiny hash router
-  styles/index.css                     Tailwind v4 + design tokens (light/dark)
-  data/                                curated, validated curriculum (read-only)
-    lexicon.ts  characters.ts  grammar.ts  sentences.ts  units.ts
-    tones.ts  dialogues.ts  stories.ts  missions.ts  confusables.ts  benchmark.ts
+  main.tsx, index.css                  app shell, Tailwind v4 (light/dark)
+  data/                                curated, validated curriculum (read-only)          [slice 3]
   lib/
-    pinyin/      tone-mark ↔ number, syllable parsing/validation, sandhi, input normalisation
-    content/     curriculum index, segmentation, validation, coverage
-    srs/         FSRS wrapper, rating policy
-    engine/      learner model, mastery, ability, planner, selector, evaluation,
-                 errors, progress, meta-learning, commands, achievements
-    audio/       tts, recorder, pitch (YIN), tone analysis, stt
-    ai/          provider abstraction + adapters, prompts, tutor, generation
-    db/          Dexie schema, repositories, migrations, import/export
-    i18n/        UI strings with immersion-level variants
-  components/    UI primitives (Button, Card, Sheet, HanziText, AudioButton…)
-  features/      screens
+    types.ts       shared domain types
+    pinyin.ts      syllable inventory, tone marks, input parsing, display, sandhi, grading
+    segment.ts     tokenising curated text, segmenting arbitrary text, known-word coverage
+    (planned) srs.ts, engine/…, audio/…, ai/…, db.ts                                     [slices 2–9]
+  features/      screens                                                                 [slice 4+]
 ```
+
+Grows only when a slice needs it; this block is updated as files land.
 
 ## 4. Key technical choices
 
@@ -90,7 +88,7 @@ src/
 | Spaced repetition | `ts-fsrs` (FSRS-6, MIT) | Evidence-based, the reference TS implementation of FSRS; parameters optimisable later from our review logs. |
 | Storage | Dexie 4 over IndexedDB | Mature, small, works on iOS Safari, live queries for reactive UI. |
 | Pinyin for arbitrary text | `pinyin-pro` (MIT) | Context-aware polyphone handling; used to (a) cross-validate curated pinyin in tests and (b) generate pinyin for AI text instead of trusting the model. |
-| Word segmentation | Longest-match on lexicon, fallback `Intl.Segmenter('zh', {granularity:'word'})` | Free, local, built into Safari/Chrome/Node. |
+| Word segmentation | `Intl.Segmenter('zh', {granularity:'word'})` first; ICU words the lexicon lacks are split by longest lexicon match (ICU joins 去了, the lexicon has 去 + 了); unknown runs stay whole | Native (Safari/Chrome/Node), free, local; ~30 lines instead of a bidirectional matcher. |
 | Pitch detection | Own YIN implementation | ~100 lines, deterministic, testable with synthetic signals, no dependency. |
 | TTS | `speechSynthesis` with best zh-CN voice ranking | Free; iOS voices are on-device; Edge/Chrome have good voices. AudioAsset abstraction allows pre-recorded/native audio later. |
 | Styling | Tailwind CSS v4 | Fast to build a consistent, polished mobile-first UI with dark mode. |
