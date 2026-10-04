@@ -75,7 +75,11 @@ src/
     types.ts       shared domain types
     pinyin.ts      syllable inventory, tone marks, input parsing, display, sandhi, grading
     segment.ts     tokenising curated text, segmenting arbitrary text, known-word coverage
-    (planned) srs.ts, engine/…, audio/…, ai/…, db.ts                                     [slices 2–9]
+    srs.ts         FSRS (ts-fsrs) + corrupt-card guard + evidence → grade policy
+    learner.ts     mastery status, facet unlocking, item stats, Elo skill abilities, progress metrics
+    grade.ts       English/Chinese answer grading, error classification, derived error patterns
+    planner.ts     session plan with rationale, exercise-format choice, in-session scaffold adaptation
+    (planned) audio/…, ai/…, db.ts                                                      [slices 4–9]
   features/      screens                                                                 [slice 4+]
 ```
 

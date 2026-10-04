@@ -1,6 +1,8 @@
 // Shared domain types. See DATABASE_SCHEMA.md for the persisted shapes and LEARNING_ENGINE.md
 // for semantics. Curated content types are read-only data bundled with the app.
 
+import type { Card } from 'ts-fsrs';
+
 export type ItemKind = 'word' | 'char' | 'grammar' | 'tone' | 'tonepair' | 'sound';
 
 export type Facet =
@@ -257,25 +259,12 @@ export interface LearnerPolicy {
   notes: string[];
 }
 
-export interface CardData {
-  due: Date;
-  stability: number;
-  difficulty: number;
-  elapsed_days: number;
-  scheduled_days: number;
-  learning_steps: number;
-  reps: number;
-  lapses: number;
-  state: number; // 0 New, 1 Learning, 2 Review, 3 Relearning
-  last_review?: Date;
-}
-
 export interface SRSState {
   id: string; // `${itemId}|${facet}`
   itemId: string;
   facet: Facet;
   activatedAt: number;
-  card: CardData;
+  card: Card; // ts-fsrs card: due, stability, difficulty, state (0 New 1 Learning 2 Review 3 Relearning)…
 }
 
 export interface FacetStats {

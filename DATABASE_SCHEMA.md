@@ -42,7 +42,6 @@ Mission { id; title; description; unit; kind; evaluation }
 | `events` | `++id` | `at`, `type`, `itemId`, `sessionId` | **LearningEvent** — append-only granular log |
 | `reviews` | `++id` | `srsId`, `at` | **Review** — FSRS review log (optimiser-compatible) |
 | `errors` | `++id` | `at`, `category`, `itemId`, `patternKey` | **ErrorRecord** |
-| `patterns` | `key` | `status` | Aggregated recurring error patterns |
 | `pronunciation` | `++id` | `at`, `itemId` | **PronunciationAttempt** (scores, per-syllable diagnosis, contour) |
 | `recordings` | `++id` | `at` | **AudioAsset** (learner audio blobs; pruned to retention setting) |
 | `sessions` | `++id` | `startedAt` | **Lesson** — planned blocks, rationale, outcome summary |
@@ -61,7 +60,7 @@ Mission { id; title; description; unit; kind; evaluation }
 
 ```ts
 SRSState { id; itemId; facet; activatedAt;
-  card: { due: Date; stability; difficulty; elapsed_days; scheduled_days; learning_steps;
+  card: Card /* ts-fsrs type */ { due: Date; stability; difficulty; elapsed_days; scheduled_days; learning_steps;
           reps; lapses; state /* 0 New 1 Learning 2 Review 3 Relearning */; last_review?: Date } }
 
 MasteryState { itemId; kind; firstSeen; lastSeen; encounters;

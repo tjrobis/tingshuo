@@ -10,7 +10,7 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 |---|-------|----------|--------|
 | 0 | Foundations | Docs, scaffold (Vite/React/TS/Tailwind/PWA/Vitest/ESLint), icons, CSP | ✅ |
 | 1 | Language core | `lib/pinyin.ts` (syllables, marks, parsing any input format, sandhi, grading with initial/final/tone feedback), `lib/segment.ts` (ICU + lexicon segmentation, coverage); 26 tests | ✅ |
-| 2 | Engine core | FSRS wrapper + rating policy, mastery, Elo abilities, answer evaluation, error classification, planner, selector, progress metrics | ⏳ |
+| 2 | Engine core | `srs.ts`, `learner.ts`, `grade.ts`, `planner.ts`: FSRS + rating policy, mastery, facet unlocking, Elo abilities, grading, error classification & patterns, session planner, format choice, scaffold adaptation, progress metrics; 71 tests total | ✅ |
 | 3 | Seed curriculum | Units 1–14 (~300 words, chunks, ~25 grammar patterns, sentences, dialogues, stories, tones, confusables) + validation tests | ⏳ |
 | 4 | **MVP loop** | DB, onboarding → calibration → Learn Now session → exercises → evaluation → mastery/SRS update → dashboard → next session | ⏳ |
 | 5 | Pronunciation & listening | TTS voice ranking/speeds, recorder, YIN pitch, tone diagnosis, contour plot, tone-pair grid, listening exercise family | ⏳ |
@@ -51,3 +51,4 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 
 - 2026-10-04 — Project started. Docs written.
 - 2026-10-04 — Slice 0–1 done. Adopted ponytail engineering style: consolidated the pinyin library from 7 files to 1, replaced a hand-rolled bidirectional segmenter with native `Intl.Segmenter` + lexicon split, deleted unused helpers. Content validation (pinyin-pro cross-check) moves to slice 3 where curated data exists.
+- 2026-10-04 — Slice 2 done (4 files instead of the ~10-module `engine/` sketch). Decisions: wrong tone = Again; patterns derived from the error log (no table); `ponytail-review` cut a scheduler cache, a renaming wrapper, an uncalled JSON reviver and a duplicate helper. Found that ts-fsrs silently returns NaN/Invalid Date for a corrupt card, so `review()` guards it. Slice 4 must not schedule `produce` facets without a microphone.

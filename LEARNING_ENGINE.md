@@ -63,8 +63,9 @@ Facet meanings:
 | Evidence | Rating |
 |----------|--------|
 | Wrong, or "show answer", or gave up | Again (1) |
-| Correct but used a hint/scaffold (word bank, first letter, replay > 2, pinyin shown when normally hidden), or tone-only error accepted as "close", or very slow (> 2.5× personal median RT for that format) | Hard (2) |
+| Correct but used a hint/scaffold (word bank, first letter, replay > 2, pinyin shown when normally hidden), or missing tones ("close"), or very slow (> 2.5× personal median RT for that format) | Hard (2) |
 | Correct, normal speed | Good (3) |
+| Wrong tone (a different word in Mandarin: mǎi buy ≠ mài sell) | Again (1), logged as a `tone` error |
 | Correct, fast (< 0.6× median RT), production format, no scaffold | Easy (4) |
 | Correct on **multiple choice** | Good at most, and only for recognition facets |
 
@@ -85,7 +86,7 @@ Per item, derived (never stored as permanent truth) from facet states at time *n
 |--------|-------------------------|
 | `new` | no active facet has been reviewed |
 | `at_risk` | status would be ≥ developing, but some active facet has R(now) < 0.70 |
-| `mastered` | meaning S ≥ 30 d **and** recall S ≥ 21 d **and** (listening S ≥ 21 d if active) **and** ≥ 1 successful review at an interval ≥ 21 d |
+| `mastered` | meaning S ≥ 30 d **and** recall S ≥ 21 d **and** (listening S ≥ 21 d if active) (FSRS only reaches these stabilities through successful reviews at long intervals) |
 | `strong` | meaning S ≥ 7 d **and** recall S ≥ 3 d |
 | `developing` | max facet S ≥ 1 d |
 | `learning` | otherwise |
@@ -123,10 +124,8 @@ n < 20 — no fake percentages.
 | `audio_to_meaning_mc` | listening | 0.55 |
 | `audio_to_meaning_typed` | listening | 1.0 |
 | `meaning_to_chinese_bank` (tiles) | recall | 0.7 |
-| `meaning_to_chinese_typed` (pinyin or hanzi) | recall | 1.0 |
+| `meaning_to_chinese_typed` (pinyin or hanzi; an emoji replaces the English prompt when the item has one) | recall | 1.0 |
 | `meaning_to_chinese_spoken` | recall (+ produce tone) | 1.15 |
-| `picture_to_chinese` (emoji) | recall | 1.0 |
-| `chinese_to_picture` | listening | 0.5 |
 | `hanzi_to_pinyin` (typed with tones) | reading | 1.0 |
 | `audio_to_pinyin` (dictation of syllables) | listening + reading | 1.1 |
 | `dictation` (sentence → characters/pinyin) | listening | 1.2 |
@@ -157,7 +156,8 @@ memory alone). `k` per format is **re-calibrated per learner** from predicted-vs
 3. **New-item budget:** `base = minutes / 4` (≈ 5 at 20 min), × 0 if retention health < 0.6,
    × 0.5 if < 0.75, × 0.5 if due backlog > 3× session capacity; × policy multiplier from
    meta-learning; capped by the learner's best batch size (default 8).
-4. **Block weights** (normalised to the time budget):
+4. **Block weights** — relative shares of the time left after reviews and new items. A skill only
+   counts as "lagging" once it has ≥ 10 observations; blocks under 30 s are folded into the others:
    - tones/pronunciation: 0.25 in the first 14 days or if tone accuracy < 0.7, else 0.10; +0.1 if a
      tone-confusion pattern is open.
    - review: minutes needed for due items (≈ 12 s each), capped at 60 % of the session.
@@ -195,13 +195,13 @@ Deterministic classification of structured answers (`errors.ts`):
 | `word_order` | same multiset of tokens, different order |
 | `classifier` | difference is only a measure word (个/杯/块/本/张…) |
 | `particle` | missing/extra 了/吗/呢/的/吧 |
-| `similar_word` | substituted item is in the confusables list or shares the expected item's meaning field |
-| `character_confusion` | same pinyin, different characters (homophone) or shared component |
+| `similar_word` | exactly one word substituted for another (recorded as a confused pair, so repeats surface as a pattern) |
+| `character_confusion` | *(planned)* homophone substitution — needs lexicon pinyin lookups (slice 3+) |
 | `listening_confusion` | listening exercise wrong where the chosen item differs by tone/initial/final only |
 | `grammar` | other structural difference on grammar exercises |
 | `other` | none of the above |
 
-Pattern detection: group by (category, item) and confusion pairs (A↔B); **recurring** = ≥ 2
+Patterns are **derived from the error log on read** (no stored table). Pattern detection: group by (category, item) and confusion pairs (A↔B); **recurring** = ≥ 2
 occurrences in 14 days. Recurring patterns spawn targeted drills (e.g. 是 vs 有 contrast sentences;
 T2↔T3 discrimination sets). A pattern is **resolved** after 3 correct targeted drills on ≥ 2
 different days. *(AI)* free-text and conversation errors are categorised by the AI into the same
