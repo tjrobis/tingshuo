@@ -55,9 +55,8 @@ export interface VocabularyItem {
   hanzi: string;
   /** Citation pinyin with tone numbers, one syllable per character, space separated. Neutral = 0. */
   pinyin: string;
+  /** First is the display gloss; all are accepted when grading. */
   meanings: string[];
-  /** Extra English answers accepted when grading, beyond `meanings`. */
-  accept?: string[];
   pos: string;
   unit: number;
   /** Approximate frequency band: 1 = very common (top ~300) … 5 = rarer. */
@@ -65,9 +64,7 @@ export interface VocabularyItem {
   topics: string[];
   emoji?: string;
   note?: string;
-  measure?: string;
-  literal?: string;
-  /** Hidden from new-item introduction (e.g. proper names used in stories). */
+  /** Names etc.: allowed in sentences, never introduced as vocabulary. */
   incidental?: boolean;
 }
 
@@ -76,7 +73,7 @@ export interface CharacterInfo {
   char: string;
   pinyin: string;
   meaning: string;
-  components?: { part: string; meaning: string }[];
+  components?: string; // "女 woman + 子 child"
   mnemonic?: string;
 }
 
@@ -86,26 +83,18 @@ export interface GrammarConcept {
   pattern: string;
   explanation: string;
   why: string;
-  unit: number;
-  examples: string[]; // sentence ids
-  prereqs: string[];
-  /** Short "notice the pattern" prompt shown before the explanation. */
-  notice?: string;
+  unit: number; // examples = sentences tagged with this id
 }
 
 export interface Sentence {
   id: string;
   /** Chinese, tokens separated by single spaces. Tokens may be `hanzi#disambiguator`. */
+  /** Chinese, tokens separated by single spaces. Tokens may be `hanzi#disambiguator`. */
   zh: string;
-  en: string;
+  /** Accepted English translations; the first is displayed. */
+  en: string[];
   unit: number;
   grammar: string[];
-  topics: string[];
-  /** Additional acceptable English translations for grading. */
-  enAlt?: string[];
-  /** Additional acceptable Chinese renderings (space-tokenised) for production grading. */
-  zhAlt?: string[];
-  literal?: string;
 }
 
 export interface Question {
@@ -147,7 +136,6 @@ export interface Unit {
   titleZh: string;
   goal: string;
   milestone?: string;
-  topics: string[];
 }
 
 /** A scripted roleplay used when no AI provider is configured (and as structured practice). */

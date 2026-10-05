@@ -11,7 +11,7 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 | 0 | Foundations | Docs, scaffold (Vite/React/TS/Tailwind/PWA/Vitest/ESLint), icons, CSP | ✅ |
 | 1 | Language core | `lib/pinyin.ts` (syllables, marks, parsing any input format, sandhi, grading with initial/final/tone feedback), `lib/segment.ts` (ICU + lexicon segmentation, coverage); 26 tests | ✅ |
 | 2 | Engine core | `srs.ts`, `learner.ts`, `grade.ts`, `planner.ts`: FSRS + rating policy, mastery, facet unlocking, Elo abilities, grading, error classification & patterns, session planner, format choice, scaffold adaptation, progress metrics; 71 tests total | ✅ |
-| 3 | Seed curriculum | Units 1–14 (~300 words, chunks, ~25 grammar patterns, sentences, dialogues, stories, tones, confusables) + validation tests | ⏳ |
+| 3 | Seed curriculum | 12 units (M1 by unit 11): 215 words, 187 sentences, 51 grammar points, 71 characters, 9 tone sets, 13 sound pairs; validation tests (pinyin-pro cross-check, unit ordering, every word in a sentence, all 20 tone pairs covered) | ✅ |
 | 4 | **MVP loop** | DB, onboarding → calibration → Learn Now session → exercises → evaluation → mastery/SRS update → dashboard → next session | ⏳ |
 | 5 | Pronunciation & listening | TTS voice ranking/speeds, recorder, YIN pitch, tone diagnosis, contour plot, tone-pair grid, listening exercise family | ⏳ |
 | 6 | AI layer & tutor | Provider abstraction (Anthropic SDK, OpenAI, Gemini, OpenAI-compatible), tutor modes, scripted offline roleplays, conversation review → error bank | ⏳ |
@@ -52,3 +52,4 @@ Each slice ends with: tests → typecheck → lint → build → fix.
 - 2026-10-04 — Project started. Docs written.
 - 2026-10-04 — Slice 0–1 done. Adopted ponytail engineering style: consolidated the pinyin library from 7 files to 1, replaced a hand-rolled bidirectional segmenter with native `Intl.Segmenter` + lexicon split, deleted unused helpers. Content validation (pinyin-pro cross-check) moves to slice 3 where curated data exists.
 - 2026-10-04 — Slice 2 done (4 files instead of the ~10-module `engine/` sketch). Decisions: wrong tone = Again; patterns derived from the error log (no table); `ponytail-review` cut a scheduler cache, a renaming wrapper, an uncalled JSON reviver and a duplicate helper. Found that ts-fsrs silently returns NaN/Invalid Date for a corrupt card, so `review()` guards it. Slice 4 must not schedule `produce` facets without a microphone.
+- 2026-10-05 — Slice 3 done, sized to milestone M1 (12 units, 215 words) instead of 14 units / 300. Stories, dialogues, roleplays and missions move to the slices that consume them (5–8); the hand-made confusables list was dropped because grading already records confused pairs. Slice 4: particles (pos `part`) should only get multiple-choice meaning exercises.

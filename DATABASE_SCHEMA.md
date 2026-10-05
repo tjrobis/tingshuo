@@ -15,21 +15,23 @@ Item ids are stable strings: `w:<hanzi>[#disambiguator]`, `c:<char>`, `g:<slug>`
 
 ## Curated types (src/lib/types.ts)
 
+Authored as pipe tables in `src/data/curriculum.ts`, parsed by `src/lib/curriculum.ts`.
+Relationships are derived, not stored: a word's unit comes from its section, a sentence's pinyin
+from its tokens, a grammar point's examples from sentences tagged with its id.
+
 ```ts
-VocabularyItem { id; hanzi; pinyin /* tone numbers, space-separated syllables */;
-  meanings: string[] /* first = primary gloss */; accept?: string[] /* extra accepted English */;
-  pos; unit; freq: 1..5 /* approximate frequency band, 1 = top ~300 */;
-  topics: string[]; emoji?; note?; measure?: string /* default classifier */; literal? }
-Character { id; char; pinyin; meaning; components?: {part, meaning}[]; mnemonic?; }
-GrammarConcept { id; title; pattern; explanation /* ≤ 3 sentences */; why /* deeper "Why?" */;
-  unit; examples: sentenceId[]; prereqs: grammarId[] }
-Sentence { id; zh /* tokens separated by spaces */; en; unit; items: itemId[] /* derived */;
-  grammar: grammarId[]; topics }
-Dialogue { id; title; scenario; unit; lines: {speaker, sentenceId | zh, en, expect?: Expect[]}[] }
-Story { id; title; unit; topic; paragraphs: sentenceId[][]; questions: Question[] }
-Unit { id; n; title; goal /* "After this you can…" */; items: itemId[]; grammar: grammarId[] }
-Mission { id; title; description; unit; kind; evaluation }
+VocabularyItem { id /* w:<hanzi> */; hanzi; pinyin /* tone numbers, one syllable per char */;
+  meanings: string[] /* first = display gloss, all accepted */; pos; unit;
+  freq: 1..5 /* approximate band */; topics: string[]; emoji?; note?; incidental? /* names */ }
+CharacterInfo { id /* c:<char> */; char; pinyin; meaning; components?: string; mnemonic? }
+GrammarConcept { id /* g:<slug> */; title; pattern; explanation; why /* the "Why?" button */; unit }
+Sentence { id /* s:<surface text> */; zh /* tokens separated by spaces */;
+  en: string[] /* accepted translations, first displayed */; unit; grammar: grammarId[] }
+Unit { n; title; titleZh; goal /* "After this unit you can…" */; milestone? }
+toneSets { base; chars /* one per tone */ }   soundPairs { id /* s:zh-j */; label; pair }
 ```
+
+Dialogue, Story, Roleplay and Mission types land with the slices that use them (5–8).
 
 ## Learner tables (Dexie)
 

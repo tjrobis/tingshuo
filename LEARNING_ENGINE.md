@@ -209,7 +209,9 @@ categories, then pass through the same pattern detector.
 
 ## 9. Content validation
 
-Curated data (`src/data/*`) is checked by `content/validate.ts` in the test suite:
+Curated data (`src/data/curriculum.ts`) is checked by `src/lib/curriculum.test.ts`. Pinyin-pro
+differences are recorded in a hand-reviewed list that fails the test if it grows *or* goes stale
+(currently empty: all 215 words agree). The checks were mutation-tested with planted errors.
 
 1. Every pinyin syllable is a valid Mandarin syllable; tone count = syllable count = character count
    (with erhua/neutral exceptions explicitly listed).

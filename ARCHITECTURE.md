@@ -70,7 +70,7 @@ debt ledger instead of rotting. Modules are single files until they genuinely ou
 ```
 src/
   main.tsx, index.css                  app shell, Tailwind v4 (light/dark)
-  data/                                curated, validated curriculum (read-only)          [slice 3]
+  data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
     types.ts       shared domain types
     pinyin.ts      syllable inventory, tone marks, input parsing, display, sandhi, grading
@@ -79,6 +79,7 @@ src/
     learner.ts     mastery status, facet unlocking, item stats, Elo skill abilities, progress metrics
     grade.ts       English/Chinese answer grading, error classification, derived error patterns
     planner.ts     session plan with rationale, exercise-format choice, in-session scaffold adaptation
+    curriculum.ts  parses data/curriculum.ts into typed words, sentences, grammar, units, drills
     (planned) audio/…, ai/…, db.ts                                                      [slices 4–9]
   features/      screens                                                                 [slice 4+]
 ```
