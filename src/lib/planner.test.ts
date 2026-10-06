@@ -4,7 +4,7 @@ import { adaptScaffold, chooseFormat, planSession, type PlanInput } from './plan
 const now = new Date('2026-10-04T12:00:00').getTime();
 const base: PlanInput = {
   minutes: 20, now, daysActive: 30, dueCount: 20, retentionHealth: 0.85, abilities: {}, toneAccuracy: 0.85,
-  micAvailable: true, knownWords: 120, inputAvailable: true, recurringPatterns: 0, toneConfusion: false,
+  audio: true, micAvailable: true, knownWords: 120, inputAvailable: true, recurringPatterns: 0, toneConfusion: false,
   focus: [], newItemCap: 8, newAvailable: 50,
 };
 const plan = (p: Partial<PlanInput>) => planSession({ ...base, ...p });
@@ -81,5 +81,23 @@ describe('adaptScaffold', () => {
     expect(adaptScaffold([true, true, false, true, true, false, true, true], 0)).toBe(0);
     expect(adaptScaffold(Array(8).fill(true), -2)).toBe(-2);
     expect(adaptScaffold([true, true], 0)).toBe(0);
+  });
+});
+
+describe('planSession without a Chinese voice', () => {
+  it('drops tone and listening time and never claims tones are the priority', () => {
+    const p = plan({ audio: false, daysActive: 0 });
+    expect(p.blocks.some((b) => b.kind === 'warmup' || b.kind === 'listening')).toBe(false);
+    expect(p.priority).not.toMatch(/Tones/);
+    expect(total(p)).toBeCloseTo(20, 0);
+  });
+});
+
+describe('planSession when nothing else can use the time', () => {
+  it('lets new items take it, within the cap and the retention gate', () => {
+    const idle = { audio: false, micAvailable: false, inputAvailable: false, recurringPatterns: 0, dueCount: 0, retentionHealth: null };
+    expect(plan(idle).newItems).toBe(8);
+    expect(plan({ ...idle, retentionHealth: 0.5 }).newItems).toBe(0);
+    expect(plan(idle).priority).toMatch(/8 new item/);
   });
 });

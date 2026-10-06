@@ -68,12 +68,14 @@ export interface AnswerFact {
   context?: string; // sentence / story id
 }
 
+export const newMastery = (itemId: string, kind: ItemKind, at: number): MasteryState => ({
+  itemId, kind, firstSeen: at, lastSeen: at, encounters: 0, byFacet: {},
+  rtSamples: [], contexts: [], mistakes: [], confusions: [], lookups: 0, flags: {},
+});
+
 /** Fold one answer into the item's running statistics. */
 export function recordAnswer(m: MasteryState | undefined, a: AnswerFact): MasteryState {
-  const prev: MasteryState = m ?? {
-    itemId: a.itemId, kind: a.kind, firstSeen: a.at, lastSeen: a.at, encounters: 0, byFacet: {},
-    rtSamples: [], contexts: [], mistakes: [], confusions: [], lookups: 0, flags: {},
-  };
+  const prev = m ?? newMastery(a.itemId, a.kind, a.at);
   const f = prev.byFacet[a.facet] ?? { correct: 0, incorrect: 0 };
   const mistake = prev.mistakes.find((x) => x.given === a.given);
   const confusion = prev.confusions.find((x) => x.itemId === a.confusedWith);

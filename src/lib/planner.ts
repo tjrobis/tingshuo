@@ -14,6 +14,8 @@ export interface PlanInput {
   retentionHealth: number | null;
   abilities: Partial<Record<Skill, { theta: number; n: number }>>;
   toneAccuracy: number | null;
+  /** A Chinese speech voice exists; without one, tone and listening practice can't run. */
+  audio: boolean;
   micAvailable: boolean;
   knownWords: number;
   /** A text exists at the learner's target coverage. */
@@ -48,7 +50,24 @@ export function planSession(p: PlanInput): SessionPlan {
   const reviews = Math.floor((reviewMin * 60) / REVIEW_SEC);
   const backlog = (p.dueCount * REVIEW_SEC) / 60 > 3 * T;
 
-  // 2. New items, gated by whether recent ones are sticking.
+  // 2. Time for everything else, weighted toward weaknesses.
+  const early = p.daysActive < 14;
+  const weakTones = p.toneAccuracy !== null && p.toneAccuracy < 0.7;
+  const weights: [PlanBlock['kind'], number, string][] = [
+    ['warmup', p.audio ? (early || weakTones ? 0.25 : 0.1) + (p.toneConfusion ? 0.1 : 0) : 0,
+      weakTones ? `Tone accuracy is ${pct(p.toneAccuracy!)}, so tones get extra time.`
+      : early ? 'First two weeks: tones get extra time so bad habits never form.'
+      : 'Tone and pronunciation warm-up.'],
+    ['listening', p.audio ? (lags('listening') ? 0.25 : 0.15) * boost('listening') : 0,
+      lags('listening') ? 'Listening lags your vocabulary, so it gets extra time.' : 'Listening practice with words you know.'],
+    ['speaking', p.micAvailable ? (lags('speaking') ? 0.25 : 0.15) * boost('speaking') : 0,
+      lags('speaking') ? 'Speaking lags your vocabulary, so it gets extra time.' : 'Speaking: say it, hear it back, fix it.'],
+    ['input', p.inputAvailable && p.knownWords >= 30 ? 0.1 * boost('reading') : 0, 'You know enough words for a short story at your level.'],
+    ['errors', p.recurringPatterns ? 0.1 : 0, `${p.recurringPatterns} mistake pattern(s) keep coming back; targeted drills.`],
+  ];
+
+  // 3. New items, gated by whether recent ones are sticking. If nothing else can use the time
+  //    (no audio, no mic, no stories yet), new items may take it, still within the cap.
   let mult = 1;
   if (p.retentionHealth !== null && p.retentionHealth < 0.6) {
     mult = 0;
@@ -58,28 +77,14 @@ export function planSession(p: PlanInput): SessionPlan {
     rationale.push(`Fewer new words: ${pct(p.retentionHealth)} of recent words were remembered, so they get reinforced first.`);
   }
   if (backlog) mult *= 0.5;
-  const newItems = Math.max(0, Math.min(p.newAvailable, p.newItemCap, Math.round((T / 4) * mult), Math.floor(((T - reviewMin) * 60) / NEW_SEC)));
+  const budget = weights.some(([, w]) => w > 0) ? Math.round((T / 4) * mult) : Math.floor(p.newItemCap * mult);
+  const newItems = Math.max(0, Math.min(p.newAvailable, p.newItemCap, budget, Math.floor(((T - reviewMin) * 60) / NEW_SEC)));
   const newMin = (newItems * NEW_SEC) / 60;
 
-  // 3. Remaining time, weighted toward weaknesses.
-  const early = p.daysActive < 14;
-  const weakTones = p.toneAccuracy !== null && p.toneAccuracy < 0.7;
-  const weights: [PlanBlock['kind'], number, string][] = [
-    ['warmup', (early || weakTones ? 0.25 : 0.1) + (p.toneConfusion ? 0.1 : 0),
-      weakTones ? `Tone accuracy is ${pct(p.toneAccuracy!)}, so tones get extra time.`
-      : early ? 'First two weeks: tones get extra time so bad habits never form.'
-      : 'Tone and pronunciation warm-up.'],
-    ['listening', (lags('listening') ? 0.25 : 0.15) * boost('listening'),
-      lags('listening') ? 'Listening lags your vocabulary, so it gets extra time.' : 'Listening practice with words you know.'],
-    ['speaking', p.micAvailable ? (lags('speaking') ? 0.25 : 0.15) * boost('speaking') : 0,
-      lags('speaking') ? 'Speaking lags your vocabulary, so it gets extra time.' : 'Speaking: say it, hear it back, fix it.'],
-    ['input', p.inputAvailable && p.knownWords >= 30 ? 0.1 * boost('reading') : 0, 'You know enough words for a short story at your level.'],
-    ['errors', p.recurringPatterns ? 0.1 : 0, `${p.recurringPatterns} mistake pattern(s) keep coming back; targeted drills.`],
-  ];
   const rest = Math.max(0, T - reviewMin - newMin);
   // Blocks under half a minute aren't worth switching to; their time goes to the rest.
   const all = weights.reduce((s, [, w]) => s + w, 0);
-  const kept = weights.filter(([, w]) => (rest * w) / all >= 0.5);
+  const kept = all ? weights.filter(([, w]) => (rest * w) / all >= 0.5) : [];
   const survivors = kept.length ? kept : [...weights].sort((a, b) => b[1] - a[1]).slice(0, 1);
   const total = survivors.reduce((s, [, w]) => s + w, 0);
 
@@ -95,11 +100,12 @@ export function planSession(p: PlanInput): SessionPlan {
   const priority =
     p.retentionHealth !== null && p.retentionHealth < 0.6 ? "Recent words aren't sticking yet, so today reinforces them instead of adding more."
     : backlog ? 'Reviews have piled up; today clears the most at-risk ones first.'
-    : weakTones || early ? 'Tones first: getting them right now prevents months of bad habits.'
-    : lags('listening') ? 'Your vocabulary is ahead of your listening, so today emphasises listening.'
+    : p.audio && (weakTones || early) ? 'Tones first: getting them right now prevents months of bad habits.'
+    : p.audio && lags('listening') ? 'Your vocabulary is ahead of your listening, so today emphasises listening.'
     : lags('speaking') ? 'You understand more than you can say, so today emphasises speaking.'
     : p.recurringPatterns ? 'A few mistakes keep coming back; today targets them.'
-    : `Steady progress: reviews, then ${newItems} new item(s) in context.`;
+    : p.dueCount ? `Steady progress: ${reviews} review(s), then ${newItems} new item(s) in context.`
+    : `${newItems} new item(s) today, each taught in a sentence and practised until it sticks.`;
 
   return { blocks, newItems, reviews, priority, rationale: [...rationale, ...blocks.map((b) => b.reason)] };
 }

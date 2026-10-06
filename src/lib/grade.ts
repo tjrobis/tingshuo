@@ -14,6 +14,8 @@ export interface GradeResult {
   given?: string;
   /** Tone errors as "expected>given", e.g. "3>2". */
   toneSwaps?: string[];
+  /** Item the learner picked instead (multiple choice), for confusion tracking. */
+  confusedWith?: string;
 }
 
 // ───────────── English answers ─────────────

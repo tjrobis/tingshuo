@@ -1,7 +1,8 @@
 // Parses the curated tables in src/data/curriculum.ts into typed, indexed content.
 
 import { CHARACTERS, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, TONE_SETS, UNITS } from '../data/curriculum';
-import { parseNumbered } from './pinyin';
+import type { ChineseTarget } from './grade';
+import { formatWord, parseNumbered, surfaceTones, type Syllable } from './pinyin';
 import { splitTokenised } from './segment';
 import type { CharacterInfo, GrammarConcept, Sentence, Unit, VocabularyItem } from './types';
 
@@ -49,6 +50,29 @@ export const sentences: Sentence[] = rows(SENTENCES).map(({ unit, cols: [zh, en,
 export const sentenceWords = (s: Sentence): string[] =>
   splitTokenised(s.zh).filter((t) => t.kind === 'han').map((t) => `w:${t.ref}`);
 
+const wordSyllables = (ref: string): Syllable[] => parseNumbered(wordById.get(`w:${ref}`)!.pinyin);
+
+/** Display pinyin for tokenised text, one orthographic word per token: "Nǐ hǎo ma?" style spacing. */
+export const pinyinText = (zh: string): string =>
+  splitTokenised(zh)
+    .map((t) => (t.kind === 'han' ? formatWord(wordSyllables(t.ref!)) : t.text))
+    .join(' ')
+    .replace(/[，。？！、]/g, (c) => ({ '，': ',', '。': '.', '？': '?', '！': '!', '、': ',' })[c]!)
+    .replace(/ ([,.?!])/g, '$1');
+
+/** What a learner must produce for tokenised text (a word key like "你好" works too). */
+export function targetFor(zh: string): ChineseTarget {
+  const han = splitTokenised(zh).filter((t) => t.kind === 'han');
+  const pinyin = han.flatMap((t) => wordSyllables(t.ref!));
+  const chars = han.flatMap((t) => Array.from(t.text));
+  return {
+    hanzi: han.map((t) => t.text).join(''),
+    tokens: han.map((t) => t.text),
+    pinyin,
+    surface: surfaceTones(chars.map((hanzi, i) => ({ hanzi, tone: pinyin[i].tone ?? 0 }))),
+  };
+}
+
 export const grammar: GrammarConcept[] = rows(GRAMMAR).map(({ unit, cols: [id, title, pattern, explanation, why] }) => ({
   id, title, pattern, explanation, why, unit,
 }));
@@ -65,10 +89,11 @@ export const characters: CharacterInfo[] = rows(CHARACTERS).map(({ cols: [char, 
 export const toneSets = rows(TONE_SETS).map(({ cols: [base, ...chars] }) => ({ base, chars }));
 
 /** Minimal pairs for sounds English speakers merge (zh/j, u/ü, -n/-ng…). */
-export const soundPairs = rows(SOUND_PAIRS).map(({ cols: [id, label, ...pair] }) => ({
-  id: `s:${id}`,
+export const soundPairs = rows(SOUND_PAIRS).map(({ cols: [id, label, a, b, tip] }) => ({
+  id: `snd:${id}`,
   label,
-  pair: pair.map((p) => {
+  tip,
+  pair: [a, b].map((p) => {
     const [char, pinyin] = p.split(' ');
     return { char, pinyin };
   }),

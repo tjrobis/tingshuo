@@ -35,6 +35,10 @@ Dialogue, Story, Roleplay and Mission types land with the slices that use them (
 
 ## Learner tables (Dexie)
 
+Version 1 creates the tables the learning loop uses: `profile`, `srs`, `mastery`, `events`, `reviews`,
+`errors`, `sessions`, `abilities`, `assessments`. The others below are added (Dexie version bump) by
+the slice that first needs them. `patterns` is not a table: patterns are derived from `errors`.
+
 | Table | Primary key | Indexes | Purpose |
 |-------|-------------|---------|---------|
 | `profile` | `id` (`'me'`) | — | **User** + preferences + **Interest**[] + **Goal**[] + AI config (non-secret) |

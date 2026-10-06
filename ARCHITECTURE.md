@@ -69,7 +69,9 @@ debt ledger instead of rotting. Modules are single files until they genuinely ou
 
 ```
 src/
-  main.tsx, index.css                  app shell, Tailwind v4 (light/dark)
+  main.tsx, index.css                  entry, Tailwind v4 (light/dark follows the system)
+  app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session
+                 (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
     types.ts       shared domain types
@@ -80,8 +82,12 @@ src/
     grade.ts       English/Chinese answer grading, error classification, derived error patterns
     planner.ts     session plan with rationale, exercise-format choice, in-session scaffold adaptation
     curriculum.ts  parses data/curriculum.ts into typed words, sentences, grammar, units, drills
-    (planned) audio/…, ai/…, db.ts                                                      [slices 4–9]
-  features/      screens                                                                 [slice 4+]
+    session.ts     item registry, in-memory learner state, plan input, queue building, introduce,
+                   applyAnswer (grade → FSRS → stats → ability → errors → unlocks), placement seeding
+    exercise.ts    slot → concrete exercise (format chosen at show time) and grading a response
+    db.ts          Dexie schema, atomic persistence of each learning step, state loading
+    tts.ts         browser speech synthesis with Chinese-voice detection
+    (planned) audio pitch analysis, ai/…                                                 [slices 5–9]
 ```
 
 Grows only when a slice needs it; this block is updated as files land.

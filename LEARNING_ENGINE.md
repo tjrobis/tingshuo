@@ -73,7 +73,7 @@ Other signals:
 
 - **Lookup during reading** of an item whose `meaning` facet is active → Again on `meaning`
   (unless reviewed in the last 10 minutes — avoids double penalty).
-- **Secondary evidence:** an exercise has one primary facet. If it also exercises another facet
+- **Secondary evidence** *(planned, not yet implemented)*: an exercise has one primary facet. If it also exercises another facet
   that is currently due (R < target), that facet receives the same rating (implicit review);
   otherwise only an exposure is logged.
 - Exposures (seeing a known word in a story) are logged as events but are **not** reviews.
@@ -175,12 +175,18 @@ memory alone). `k` per format is **re-calibrated per learner** from predicted-vs
 
 ### In-session adaptation (`selector.ts`)
 
-- Rolling success over the last 8 graded exercises:
-  > 0.92 → scaffold level −1 (harder formats, faster audio, hide pinyin), allow +1 new item;
-  < 0.65 → scaffold +1, insert an easier review, defer remaining new items.
-- Format choice per exercise: pick the hardest format whose predicted P ≥ 0.75 (target band 0.75–0.90).
-- An item failed twice in a session gets a different representation (contrast, mnemonic, breakdown)
-  and is re-queued once; failed 3× → parked until next session (leech protection).
+- Rolling success over the last 8 graded exercises: > 0.92 → scaffold −1 (harder formats);
+  < 0.65 → scaffold +1 (easier formats).
+- Format choice per exercise, made when the exercise is shown: the hardest format whose predicted
+  P ≥ 0.75 + 0.05 × scaffold. While a facet is still being learned (stability < 1 day, or its last
+  answer was wrong) predicted P is taken as 0, so it gets the most supportive format: FSRS predicts
+  ~100 % recall right after *any* review, which would otherwise make retries harder after a miss.
+- A wrong answer is re-queued once, 2 exercises later; an item missed 3× in a session is parked until
+  the next session (leech protection). Facets unlocked mid-session (e.g. recall) are queued 3 later.
+- The session ends when its time is up (no new introduction starts with < 45 s left) or the queue empties.
+- If no other block can use the time (no audio, no mic, no stories yet), new items may take it, still
+  within the cap and the retention gate.
+- *(Planned)* a different representation (contrast, mnemonic) for an item failed twice.
 - "Too easy" / "too hard" commands shift the scaffold level persistently by ±1.
 
 ## 8. Error model ("error bank")

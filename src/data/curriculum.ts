@@ -645,19 +645,19 @@ tu|秃|图|土|兔
 fan|翻|烦|反|饭
 `;
 
-// id | what is contrasted | char pinyin | char pinyin — sounds English speakers commonly merge.
+// id | what is contrasted | char pinyin | char pinyin | how to make each sound — pairs English speakers commonly merge.
 export const SOUND_PAIRS = `
-zh-j|zh vs j|知 zhi1|鸡 ji1
-ch-q|ch vs q|吃 chi1|七 qi1
-sh-x|sh vs x|师 shi1|西 xi1
-z-zh|z vs zh|资 zi1|知 zhi1
-c-ch|c vs ch|擦 ca1|插 cha1
-s-sh|s vs sh|四 si4|是 shi4
-b-p|b vs p (puff of air)|宝 bao3|跑 pao3
-d-t|d vs t (puff of air)|搭 da1|他 ta1
-g-k|g vs k (puff of air)|哥 ge1|科 ke1
-u-ü|u vs ü|路 lu4|绿 lü4
-n-ng|-n vs -ng|金 jin1|京 jing1
-an-ang|an vs ang|山 shan1|商 shang1
-r-l|r vs l|热 re4|乐 le4
+zh-j|zh vs j|知 zhi1|鸡 ji1|zh: tongue tip curled back to the roof of the mouth. j: tongue flat, tip behind the lower teeth, lips spread.
+ch-q|ch vs q|吃 chi1|七 qi1|ch: curled back like zh, with a puff of air. q: like j, with a puff of air and lips spread.
+sh-x|sh vs x|师 shi1|西 xi1|sh: tongue curled back, deeper than English "sh". x: tongue flat and lips spread, a soft "sy".
+z-zh|z vs zh|资 zi1|知 zhi1|z: like "ds" in "kids", tongue behind the teeth. zh: tongue curled back.
+c-ch|c vs ch|擦 ca1|插 cha1|c: like "ts" in "cats", with a puff of air. ch: tongue curled back, with a puff of air.
+s-sh|s vs sh|四 si4|是 shi4|s: tongue tip behind the teeth. sh: tongue curled back.
+b-p|b vs p (puff of air)|宝 bao3|跑 pao3|b: no puff of air, like the p in "spin". p: a strong puff, like the p in "pin".
+d-t|d vs t (puff of air)|搭 da1|他 ta1|d: no puff of air, like the t in "stop". t: a strong puff, like the t in "top".
+g-k|g vs k (puff of air)|哥 ge1|科 ke1|g: no puff of air, like the k in "skin". k: a strong puff, like the k in "kin".
+u-ü|u vs ü|路 lu4|绿 lü4|u: lips rounded, tongue back. ü: say "ee", then round your lips without moving your tongue.
+n-ng|-n vs -ng|金 jin1|京 jing1|-n: tongue tip touches behind the top teeth. -ng: back of the tongue rises, like "sing".
+an-ang|an vs ang|山 shan1|商 shang1|an: front of the mouth, tongue tip up. ang: back of the mouth, like "ahng".
+r-l|r vs l|热 re4|乐 le4|r: tongue curled back, close to the s in "pleasure". l: tongue tip on the ridge behind the teeth.
 `;
