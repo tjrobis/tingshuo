@@ -5,7 +5,7 @@ import { errorPatterns } from '../lib/grade';
 import { abilityBand, expectedKnown, masteryStatus, streak, trueRetention, weeklyVelocity } from '../lib/learner';
 import { planSession } from '../lib/planner';
 import { facetsOf, isIntroduced, ITEMS, planInput, type LearnerState } from '../lib/session';
-import { primeAudio } from '../lib/tts';
+import { micSupported, primeAudio } from '../lib/audio';
 import { SKILLS, type MasteryStatus } from '../lib/types';
 import { Bar, Button, Card, Label, Screen } from './ui';
 
@@ -16,7 +16,9 @@ const SKILL_NAMES: Record<string, string> = {
 /** Rounded on purpose: these are estimates, not counts. */
 const approx = (n: number) => (n < 20 ? Math.round(n) : Math.round(n / 5) * 5);
 
-export function Home({ state, audio, onLearn }: { state: LearnerState; audio: boolean; onLearn: (minutes: number) => void }) {
+export function Home({ state, audio, onLearn, onOpen }: {
+  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings') => void;
+}) {
   const [minutes, setMinutes] = useState(state.profile.sessionMinutes);
   const [why, setWhy] = useState(false);
   const now = new Date();
@@ -62,7 +64,11 @@ export function Home({ state, audio, onLearn }: { state: LearnerState; audio: bo
           <Label>{now.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</Label>
           <h1 className="text-2xl font-semibold">你好, {state.profile.name}</h1>
         </div>
-        {days > 0 && <div className="text-right text-sm text-slate-500"><span className="text-xl font-semibold text-slate-900 dark:text-slate-100">{days}</span> day streak</div>}
+        <div className="flex items-center gap-1">
+          {days > 0 && <div className="mr-2 text-right text-sm text-slate-500"><span className="text-xl font-semibold text-slate-900 dark:text-slate-100">{days}</span> day streak</div>}
+          <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('pronunciation')}>Pronunciation</Button>
+          <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('settings')} aria-label="Settings">⚙</Button>
+        </div>
       </header>
 
       <Card className="flex flex-col gap-4 bg-gradient-to-br from-indigo-600 to-teal-600 text-white ring-0">
@@ -150,6 +156,13 @@ export function Home({ state, audio, onLearn }: { state: LearnerState; audio: bo
           <Label>Keeps tripping you up</Label>
           {recurring.slice(0, 5).map((p) => <div key={p.key} className="text-sm">{p.label} <span className="text-slate-500">({p.count}×)</span></div>)}
           <p className="text-xs text-slate-500">These get targeted drills in your sessions.</p>
+        </Card>
+      )}
+
+      {audio && micSupported() && !state.profile.micAvailable && (
+        <Card className="flex items-center justify-between gap-3">
+          <p className="text-sm"><b>Speaking practice is off.</b> Turn on your microphone to practise tones and shadow sentences, with feedback on each syllable.</p>
+          <Button variant="secondary" className="shrink-0" onClick={() => onOpen('settings')}>Turn on</Button>
         </Card>
       )}
 

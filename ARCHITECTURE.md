@@ -70,7 +70,8 @@ debt ledger instead of rotting. Modules are single files until they genuinely ou
 ```
 src/
   main.tsx, index.css                  entry, Tailwind v4 (light/dark follows the system)
-  app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session
+  app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session,
+                 Pronunciation (tone-pair grid trainer), Settings, Recorder (recording, contour plot, review)
                  (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
@@ -86,7 +87,9 @@ src/
                    applyAnswer (grade → FSRS → stats → ability → errors → unlocks), placement seeding
     exercise.ts    slot → concrete exercise (format chosen at show time) and grading a response
     db.ts          Dexie schema, atomic persistence of each learning step, state loading
-    tts.ts         browser speech synthesis with Chinese-voice detection
+    audio.ts       speech synthesis (Chinese-voice detection, voice choice, speed, speaker variety) and
+                   recording (MediaRecorder → decoded PCM), all on device
+    pitch.ts       YIN pitch tracking, per-syllable tone diagnosis + feedback, rhythm, voice-range learning
     (planned) audio pitch analysis, ai/…                                                 [slices 5–9]
 ```
 

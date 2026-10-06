@@ -1,14 +1,15 @@
 // Turns a queue slot into a concrete exercise, picking the format from the current recall
 // probability (planner.chooseFormat), and grades the learner's response with grade.ts.
 
-import { characters, grammar, pinyinText, sentences, sentenceWords, soundPairs, surface, targetFor, tonePairWords, toneSets, units, wordById, words } from './curriculum';
-import { classifyError, gradeChinese, gradeEnglish, type ChineseTarget, type GradeResult } from './grade';
+import { characters, dialogues, grammar, pinyinText, sentences, sentenceWords, soundPairs, surface, targetFor, tonePairWords, toneSets, units, wordById, words } from './curriculum';
+import { classifyError, gradeChinese, gradeEnglish, type ChineseTarget, type GradeResult, type Verdict } from './grade';
 import { masteryStatus } from './learner';
 import { formatWord, markSyllable, parseNumbered, surfaceTones, type Syllable } from './pinyin';
+import type { ExpectedSpeech, ToneAnalysis } from './pitch';
 import { chooseFormat } from './planner';
 import { segment, splitTokenised } from './segment';
 import { facetsOf, isIntroduced, ITEMS, PRIMARY, type LearnerState, type Slot } from './session';
-import { retrievability } from './srs';
+import { createEmptyCard, retrievability, type Card } from './srs';
 import type { Facet, Sentence, VocabularyItem } from './types';
 
 export interface Choice {
@@ -52,11 +53,20 @@ export interface Exercise {
   context?: string; // sentence id
   /** "I'm confused" (breakdown + notes) and "Why am I learning this?" without needing AI. */
   help: { why: string; breakdown: Example[]; notes: string[] };
+  /** Answer by speaking. `selfCheck`: pitch analysis can't tell which word was said, so the learner judges that. */
+  speak?: { expected: ExpectedSpeech; selfCheck?: boolean };
+  /** Listening dialogue, played line by line in alternating voices; transcript shown after answering. */
+  dialogue?: (Example & { speaker: 'A' | 'B' })[];
+  /** Content difficulty for practice activities (ability scale). */
+  level?: number;
+  /** Voice index for listening items, so learners hear more than one speaker. */
+  voice?: number;
 }
 
 export interface MakeOptions {
   now: Date;
   audio: boolean;
+  mic: boolean;
   scaffold: number;
   rng?: () => number;
   /** Force a format (tests, placement). */
@@ -77,6 +87,11 @@ const breakdown = (zh: string): Example[] =>
   splitTokenised(zh).filter((t) => t.kind === 'han').map((t) => wordExample(wordById.get(`w:${t.ref}`)!));
 const readable = (s: LearnerState, x: Sentence, except?: string) =>
   sentenceWords(x).every((id) => id === except || isIntroduced(s, id) || wordById.get(id)?.incidental);
+/** What the pitch analysis should expect for a target: citation tones and the tones actually said. */
+export const speechTarget = (t: ChineseTarget): ExpectedSpeech => ({
+  syllables: t.pinyin.map((x) => ({ base: x.base, tone: x.tone ?? 0 })),
+  surface: t.surface ?? t.pinyin.map((x) => x.tone ?? 0),
+});
 const grammarNotes = (x: Sentence) => x.grammar.map((id) => grammar.find((g) => g.id === id)!).map((g) => `${g.title}: ${g.explanation}`);
 
 /** Sentence with one token blanked, and its pinyin with the same blank. */
@@ -114,6 +129,32 @@ function toneChoices(hanzi: string, syl: Syllable[], count: number, rng: () => n
 
 export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Exercise | null {
   const rng = opts.rng ?? Math.random;
+
+  // ── Practice (not spaced-repetition reviews) ──
+  if (slot.practice === 'dialogue') {
+    const d = dialogues.find((x) => x.id === slot.ref);
+    if (!d || !opts.audio) return null;
+    const q = d.questions[Math.floor(rng() * d.questions.length)];
+    const options = shuffle(q.options, rng);
+    const words = [...new Map(d.lines.flatMap((l) => breakdown(l.zh)).map((b) => [b.zh, b])).values()];
+    return {
+      slot, itemId: d.id, format: 'dialogue', instruction: `Listen: ${d.title}`, prompt: q.q, showPinyin: false, level: 0.4 * d.unit,
+      dialogue: d.lines.map((l) => ({ speaker: l.speaker, zh: surface(l.zh), pinyin: pinyinText(l.zh), en: l.en })),
+      choices: options.map((label) => ({ label })), answer: options.indexOf(q.options[q.answer]),
+      reveal: { zh: '', pinyin: '', en: q.options[q.answer] },
+      help: { why: 'Following a real back-and-forth, at speed, is most of what conversation is.', breakdown: words, notes: [] },
+    };
+  }
+  if (slot.practice === 'shadow') {
+    const x = sentences.find((y) => y.id === slot.ref);
+    if (!x || !opts.mic) return null;
+    return {
+      slot, itemId: slot.itemId, format: 'shadow', instruction: 'Listen, then say it the same way', zh: surface(x.zh), pinyin: pinyinText(x.zh), showPinyin: true,
+      audio: surface(x.zh), autoplay: opts.audio, speak: { expected: speechTarget(targetFor(x.zh)) }, level: 0.4 * x.unit, reveal: sentenceExample(x),
+      help: { why: 'Copying whole sentences trains rhythm and the tone changes that single words cannot.', breakdown: breakdown(x.zh), notes: grammarNotes(x) },
+    };
+  }
+
   const item = ITEMS.get(slot.itemId);
   if (!item) return null;
   const active = facetsOf(s, item.id);
@@ -164,19 +205,19 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
   }
 
   // ── Tests ──
-  const isActive = (f?: Facet) => !!f && active.some((x) => x.facet === f);
+  const isActive = (f?: Facet) => !!f && (f === 'produce' ? opts.mic : active.some((x) => x.facet === f)); // speaking needs the mic, now
   const facet = isActive(slot.facet) ? slot.facet! : isActive(PRIMARY[kind]) ? PRIMARY[kind] : undefined;
   if (!facet) return null;
-  const card = active.find((x) => x.facet === facet)!.card;
+  const card = active.find((x) => x.facet === facet)?.card ?? createEmptyCard<Card>(opts.now);
   const w = kind === 'word' ? wordById.get(item.id)! : undefined;
   const allowed = (id: string) =>
-    !id.endsWith('_spoken') && (opts.audio || !AUDIO_FORMATS.has(id)) && !(w?.pos === 'part' && id.endsWith('meaning_typed')) && !(kind === 'sound' && id === 'tone_id');
+    (opts.mic || (!id.endsWith('_spoken') && id !== 'tone_production')) && (opts.audio || !AUDIO_FORMATS.has(id)) && !(w?.pos === 'part' && id.endsWith('meaning_typed')) && !(kind === 'sound' && id === 'tone_id');
   // Right after any review FSRS predicts ~100 % recall, even after a miss. While a facet is still being
   // learned (never succeeded, or just failed), use the most supportive format instead.
   const learning = card.stability < 1 || s.mastery.get(item.id)?.byFacet[facet]?.lastResult === false;
   const format = opts.format ?? chooseFormat(facet, learning ? 0 : retrievability(card, opts.now), opts.scaffold, {}, allowed);
   if (AUDIO_FORMATS.has(format) && !opts.audio) return null;
-  const t = { ...base, facet, format };
+  const t = { ...base, facet, format, voice: facet === 'listening' ? Math.floor(rng() * 4) : undefined };
 
   if (w) {
     const key = w.id.slice(2);
@@ -204,6 +245,8 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
         return { ...t, instruction: ctx ? 'Choose the missing word' : 'Choose the Chinese', ...withContext, ...wordChoices(s, w, chinese, rng), reveal, help };
       case 'meaning_to_chinese_typed':
         return { ...t, instruction: ctx ? 'Type the missing word (pinyin or characters)' : 'Say it in Chinese (pinyin or characters)', ...withContext, targets: [targetFor(key)], reveal, help };
+      case 'meaning_to_chinese_spoken':
+        return { ...t, instruction: ctx ? 'Say the missing word' : 'Say it in Chinese', ...withContext, audio: w.hanzi, speak: { expected: speechTarget(targetFor(key)), selfCheck: true }, reveal, help };
       case 'hanzi_to_pinyin':
         return { ...t, instruction: 'Type the pinyin with tones (e.g. ni3 hao3)', zh: w.hanzi, showPinyin: false, pinyinOnly: true, targets: [targetFor(key)], reveal, help };
     }
@@ -258,6 +301,27 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
     return { ...t, instruction: 'Fill in the blank', zh: blanked.zh, pinyin: blanked.pinyin, choices: options.map((x) => ({ label: x.hanzi, sub: wordPinyin(x), itemId: x.id })), answer: options.indexOf(right), ...common };
   }
 
+  // Pronunciation (production): hear it, say it, get per-syllable tone feedback.
+  if (format === 'tone_production') {
+    let reveal: Example;
+    let expected: ExpectedSpeech;
+    if (kind === 'tone') {
+      const n = Number(item.id.slice(2));
+      const set = toneSets[Math.floor(rng() * toneSets.length)];
+      reveal = { zh: set.chars[n - 1], pinyin: markSyllable(set.base, n), en: '' };
+      expected = { syllables: [{ base: set.base, tone: n }], surface: [n] };
+    } else {
+      const pairWords = tonePairWords().get(item.id.slice(3)) ?? [];
+      const x = shuffle(pairWords.filter((y) => isIntroduced(s, y.id)), rng)[0] ?? shuffle(pairWords, rng)[0];
+      reveal = wordExample(x);
+      expected = speechTarget(targetFor(x.id.slice(2)));
+    }
+    return {
+      ...t, instruction: 'Listen, then say it', zh: reveal.zh, pinyin: reveal.pinyin, showPinyin: true, audio: reveal.zh, autoplay: opts.audio,
+      speak: { expected }, reveal, help: { why: TONES_WHY, breakdown: [], notes: [] },
+    };
+  }
+
   // Pronunciation (perception): hear it, pick what you heard.
   const count = format === 'tone_id' ? 4 : 2;
   const help = { why: TONES_WHY, breakdown: [] as Example[], notes: [] as string[] };
@@ -306,7 +370,7 @@ const whyChar = (char: string, inWords: VocabularyItem[]) =>
   `${char} appears in ${inWords.length} word${inWords.length === 1 ? '' : 's'} you're learning (${inWords.map((w) => w.hanzi).join(', ')}). Recognising it makes all of them easier to read.`;
 
 // ───────────── Grading ─────────────
-export type Response = { choice: number } | { text: string } | { order: string[] };
+export type Response = { choice: number } | { text: string } | { order: string[] } | { speech: ToneAnalysis; self?: 'good' | 'close' | 'off' };
 
 const lexSegment = (text: string) => segment(text, (w) => wordById.has(`w:${w}`)).map((t) => t.text);
 
@@ -323,6 +387,7 @@ export function gradeExercise(ex: Exercise, r: Response): GradeResult {
     const heard = ex.facet === 'listening' || ex.format === 'minimal_pair';
     return { verdict: 'wrong', notes, category: heard ? 'listening_confusion' : 'similar_word', confusedWith: picked.itemId, expected: right.label, given: picked.label };
   }
+  if ('speech' in r) return gradeSpeech(r.speech, r.self);
   if ('order' in r) {
     return r.order.join('') === ex.order!.join('')
       ? { verdict: 'correct', notes: [] }
@@ -335,5 +400,16 @@ export function gradeExercise(ex: Exercise, r: Response): GradeResult {
   return gradeChinese(r.text, ex.targets!, lexSegment);
 }
 
+/**
+ * Spoken answers: the pitch analysis judges tones; when it can't hear clearly it says "unsure" and the
+ * learner self-assesses. For spoken recall the learner also judges whether it was the right word.
+ */
+export function gradeSpeech(a: ToneAnalysis, self?: 'good' | 'close' | 'off'): GradeResult {
+  const swaps = a.syllables.filter((x) => x.detected !== null && x.detected !== x.expected).map((x) => `${x.expected}>${x.detected}`);
+  const heard: Verdict = !a.ok || a.toneScore === null || a.confidence < 0.15 ? 'unsure' : a.toneScore === 1 ? 'correct' : a.toneScore >= 0.5 ? 'close' : 'wrong';
+  const verdict: Verdict = !self ? heard : self === 'off' ? 'wrong' : self === 'close' || heard === 'close' || heard === 'wrong' ? 'close' : 'correct';
+  return { verdict, notes: a.feedback, ...(swaps.length && verdict !== 'correct' ? { category: 'tone' as const, toneSwaps: swaps } : {}) };
+}
+
 /** The text to log as "expected" for an exercise. */
-export const expectedOf = (ex: Exercise) => ex.order?.join('') ?? ex.reveal.zh ?? ex.accepted?.[0] ?? '';
+export const expectedOf = (ex: Exercise) => ex.order?.join('') || ex.reveal.zh || ex.reveal.en || ex.accepted?.[0] || '';

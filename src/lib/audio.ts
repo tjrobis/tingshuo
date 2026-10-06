@@ -1,0 +1,103 @@
+// Audio in and out through browser APIs, on the device: speech synthesis for the model voice,
+// MediaRecorder for the learner. Nothing here is sent anywhere.
+
+// ───────────── Speech out ─────────────
+const isChinese = (v: SpeechSynthesisVoice) => /^zh([-_](CN|Hans))?$/i.test(v.lang) || /^cmn/i.test(v.lang);
+const score = (v: SpeechSynthesisVoice) =>
+  (/natural|neural|online|premium|enhanced/i.test(v.name) ? 2 : 0) + (/xiaoxiao|yunxi|tingting|google/i.test(v.name) ? 1 : 0);
+
+/** Mainland Chinese voices, best first. */
+export const chineseVoices = (): SpeechSynthesisVoice[] =>
+  typeof speechSynthesis === 'undefined' ? [] : speechSynthesis.getVoices().filter(isChinese).sort((a, b) => score(b) - score(a));
+
+const prefs = { voiceURI: undefined as string | undefined, rate: 1 };
+/** Apply the learner's voice and speed settings (profile.voiceURI, profile.ttsRate). */
+export function configureSpeech(voiceURI: string | undefined, rate: number) {
+  prefs.voiceURI = voiceURI;
+  prefs.rate = rate;
+}
+
+/** Resolves true once a Mainland Chinese voice is available (voices load asynchronously in Chrome). */
+export function audioReady(timeoutMs = 1500): Promise<boolean> {
+  if (typeof speechSynthesis === 'undefined') return Promise.resolve(false);
+  if (chineseVoices().length) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const done = () => resolve(chineseVoices().length > 0);
+    speechSynthesis.addEventListener('voiceschanged', done, { once: true });
+    setTimeout(done, timeoutMs);
+  });
+}
+
+/** iOS only allows speech after a tap: call this from the tap that starts a session. */
+export function primeAudio(): void {
+  if (typeof speechSynthesis === 'undefined') return;
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  speechSynthesis.speak(u);
+}
+
+/**
+ * Speak Chinese. `rate` overrides the learner's speed; `voice` picks a specific voice index (used to
+ * give dialogue speakers different voices and to vary speakers in listening practice).
+ */
+export function speak(text: string, opts: { rate?: number; voice?: number } = {}): Promise<void> {
+  if (typeof speechSynthesis === 'undefined') return Promise.resolve();
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN';
+  u.rate = opts.rate ?? prefs.rate;
+  const voices = chineseVoices();
+  const chosen = opts.voice !== undefined && voices.length ? voices[opts.voice % voices.length] : voices.find((v) => v.voiceURI === prefs.voiceURI) ?? voices[0];
+  if (chosen) u.voice = chosen;
+  return new Promise((resolve) => {
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    speechSynthesis.speak(u);
+  });
+}
+
+// ───────────── Recording ─────────────
+export interface Recording {
+  blob: Blob;
+  pcm: Float32Array;
+  sampleRate: number;
+  durationMs: number;
+}
+
+export const micSupported = () =>
+  typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined';
+
+/** Start recording; `stop()` resolves with the audio and its decoded samples. */
+export async function startRecording(): Promise<{ stop: () => Promise<Recording> }> {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  const recorder = new MediaRecorder(stream);
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (e) => chunks.push(e.data);
+  recorder.start();
+  const started = performance.now();
+  return {
+    stop: () =>
+      new Promise((resolve, reject) => {
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          try {
+            const blob = new Blob(chunks, { type: recorder.mimeType });
+            const ctx = new AudioContext();
+            const buffer = await ctx.decodeAudioData(await blob.arrayBuffer());
+            void ctx.close();
+            resolve({ blob, pcm: buffer.getChannelData(0), sampleRate: buffer.sampleRate, durationMs: performance.now() - started });
+          } catch (e) {
+            reject(e);
+          }
+        };
+        recorder.stop();
+      }),
+  };
+}
+
+export function playBlob(blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = new Audio(url);
+  a.onended = () => URL.revokeObjectURL(url);
+  void a.play();
+}

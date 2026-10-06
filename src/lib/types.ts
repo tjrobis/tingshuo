@@ -98,8 +98,7 @@ export interface Sentence {
 }
 
 export interface Question {
-  q: string; // English or Chinese prompt
-  qZh?: string;
+  q: string;
   options: string[];
   answer: number;
 }
@@ -111,10 +110,9 @@ export interface DialogueLine {
 }
 
 export interface Dialogue {
-  id: string;
+  id: string; // d:<slug>
   title: string;
   unit: number;
-  topics: string[];
   lines: DialogueLine[];
   questions: Question[];
 }

@@ -55,7 +55,7 @@ placeholder; limited features say so in the UI.
 | Calibration | Short adaptive placement: tone perception, pinyin reading, vocab (verified by typing meaning, not self-report), characters, listening, optional mic calibration | ✅ |
 | Engine | Facet-level FSRS scheduling, mastery model, Elo skill abilities, session planner with rationale, in-session difficulty adaptation | ✅ |
 | Exercises | ~20 exercise types (see LEARNING_ENGINE.md §6); production favoured over multiple choice | ✅ |
-| Pronunciation | Native (TTS) audio, record, local pitch analysis, per-syllable tone diagnosis, pitch contour plot, replay both, slow audio, tone-pair grid with per-pair tracking | ✅ (tone analysis is heuristic; segmental scoring needs optional STT) |
+| Pronunciation | Native (TTS) audio, record, local pitch analysis, per-syllable tone diagnosis, pitch contour plot, replay both, slow audio, tone-pair grid with per-pair tracking | ✅ (tone analysis is heuristic and needs tuning on real voices; intelligibility/segmental scoring waits for slice 6 transcription) |
 | Listening | Audio→meaning/pinyin/characters, dictation, tone ID, minimal pairs, dialogue comprehension, 0.6×/0.75×/1×/1.15× speeds, voice rotation | ✅ |
 | Input | Graded stories & dialogues, every word tappable (pinyin, meaning, audio, components, mastery, "practise this"), coverage-controlled AI stories | ✅ |
 | Tutor | AI conversation partner with Learning / Conversation / Immersion / Roleplay / Challenge modes, constrained to known language; scripted offline roleplays when no AI is configured | ✅ (AI needs a provider) |
@@ -73,7 +73,7 @@ placeholder; limited features say so in the UI.
 | Offline | PWA; reviews, lessons, dictionary, progress offline | ✅ (TTS voice availability depends on device) |
 | Debug | Hidden dashboard: learner model, SRS table, planner decisions, AI log, validation report | ✅ |
 | Sync | Multi-device sync | ⏳ (export/import is the interim path) |
-| STT | Speech-to-text for intelligibility/segmental feedback | 🟡 Optional browser STT (not available in iOS home-screen apps); optional AI-provider transcription |
+| STT | Speech-to-text for intelligibility/segmental feedback | ⏳ Slice 6: optional AI-provider transcription (works in iOS home-screen apps; browser STT does not, and sends audio to Google/Apple) |
 
 ## 6. Deliberate deviations from the original brief (and why)
 

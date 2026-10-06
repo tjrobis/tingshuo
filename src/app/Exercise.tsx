@@ -1,7 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { playBlob, speak } from '../lib/audio';
 import type { Exercise, Response } from '../lib/exercise';
-import type { GradeResult } from '../lib/grade';
-import { speak } from '../lib/tts';
+import type { GradeResult, Verdict } from '../lib/grade';
+import type { Speaker } from '../lib/pitch';
+import { Recorder, SpeechReview, type Spoken } from './Recorder';
 import { Button, Card, Label, Speak } from './ui';
 
 interface Props {
@@ -10,10 +12,13 @@ interface Props {
   result?: GradeResult; // set once answered
   onSubmit: (r: Response) => void;
   onContinue: () => void;
-  /** Learner overrides the verdict (typo the grader missed, valid alternative answer…). */
-  onOverride?: (correct: boolean) => void;
+  /** Learner overrides the verdict (typo the grader missed, valid alternative answer, unclear audio…). */
+  onOverride?: (verdict: Verdict) => void;
   /** Hints, slow audio, revealed pinyin, help panels: the answer then counts as assisted. */
   onAssist: (kind: 'confused' | 'why' | 'pinyin' | 'slow') => void;
+  speaker?: Speaker;
+  /** A recording was analysed (saved even if the learner later overrides the verdict). */
+  onSpoken?: (s: Spoken) => void;
 }
 
 const Chinese = ({ text, highlight, className = 'text-4xl' }: { text: string; highlight?: string; className?: string }) => {
@@ -22,18 +27,34 @@ const Chinese = ({ text, highlight, className = 'text-4xl' }: { text: string; hi
   return <span className={className}>{before}<mark className="rounded-lg bg-amber-200/70 px-0.5 text-inherit dark:bg-amber-500/30">{highlight}</mark>{rest.join(highlight)}</span>;
 };
 
-export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverride, onAssist }: Props) {
+export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverride, onAssist, speaker, onSpoken }: Props) {
   const [text, setText] = useState('');
   const [tiles, setTiles] = useState<number[]>([]);
   const [pinyinShown, setPinyinShown] = useState(false);
   const [textShown, setTextShown] = useState(!ex.intro?.audioFirst);
   const [panel, setPanel] = useState<'confused' | 'why' | null>(null);
+  const [spoken, setSpoken] = useState<Spoken>();
+  const playing = useRef(0); // bumping it cancels a dialogue that is mid-playback
   const answered = !!result;
   const intro = ex.intro;
 
+  /** Dialogue lines in turn, each speaker with their own voice where the device has two. */
+  async function playDialogue(rate?: number) {
+    const run = ++playing.current;
+    for (const line of ex.dialogue ?? []) {
+      if (run !== playing.current) return;
+      await speak(line.zh, { rate, voice: line.speaker === 'A' ? 0 : 1 });
+    }
+  }
+
   useEffect(() => {
-    if (audio && ex.audio && (ex.autoplay || intro)) void speak(ex.audio);
-  }, [ex, audio, intro]);
+    if (!audio) return;
+    if (ex.dialogue) void playDialogue();
+    else if (ex.audio && (ex.autoplay || intro)) void speak(ex.audio, { voice: ex.voice });
+    // A playback counter, not a DOM ref: bumping the latest value is exactly what cancels playback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => void playing.current++;
+  }, [ex, audio, intro]); // eslint-disable-line react-hooks/exhaustive-deps -- playDialogue reads ex
 
   const submitText = () => text.trim() && onSubmit({ text });
   useEffect(() => {
@@ -87,23 +108,55 @@ export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverri
         </Card>
       ) : (
         <Card className="flex flex-col items-center gap-3 py-8 text-center">
+          {ex.dialogue && (
+            <div className="flex w-full flex-col items-center gap-3">
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => void playDialogue()}>▶ Play conversation</Button>
+                <Button variant="ghost" onClick={() => { onAssist('slow'); void playDialogue(0.75); }}>Slower</Button>
+              </div>
+              {answered && (
+                <ol className="flex w-full flex-col gap-2 text-left">
+                  {ex.dialogue.map((l, i) => (
+                    <li key={i} className={`flex items-start gap-2 ${l.speaker === 'B' ? 'flex-row-reverse text-right' : ''}`}>
+                      <Speak text={l.zh} />
+                      <div className={`rounded-2xl px-3 py-2 ${l.speaker === 'A' ? 'bg-slate-100 dark:bg-slate-800' : 'bg-indigo-50 dark:bg-indigo-950/50'}`}>
+                        <div className="text-xl">{l.zh}</div>
+                        <div className="text-sm text-slate-500">{l.pinyin}</div>
+                        <div className="text-sm">{l.en}</div>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
           {ex.prompt && <p className="text-lg">{ex.emoji && <span className="mr-2">{ex.emoji}</span>}{ex.prompt}</p>}
           {!ex.prompt && ex.emoji && <span className="text-4xl">{ex.emoji}</span>}
           {ex.zh && (zhVisible
             ? <Chinese text={answered && ex.filled ? ex.filled.zh : ex.zh} highlight={ex.highlight} className={ex.zh.length > 6 ? 'text-3xl' : 'text-6xl'} />
-            : <button type="button" onClick={() => ex.audio && void speak(ex.audio)} className="rounded-full bg-indigo-600 p-6 text-white shadow-lg" aria-label="Play again">
+            : <button type="button" onClick={() => ex.audio && void speak(ex.audio, { voice: ex.voice })} className="rounded-full bg-indigo-600 p-6 text-white shadow-lg" aria-label="Play again">
                 <svg viewBox="0 0 24 24" className="size-10" fill="currentColor" aria-hidden><path d="M11 5 6 9H2v6h4l5 4V5z" /></svg>
               </button>)}
           {ex.zh && zhVisible && ex.pinyin && (showPinyin
             ? <div className="text-slate-500">{answered && ex.filled ? ex.filled.pinyin : ex.pinyin}</div>
             : !ex.pinyinOnly && <button type="button" className="text-sm text-indigo-600 dark:text-indigo-400" onClick={() => { setPinyinShown(true); onAssist('pinyin'); }}>Show pinyin</button>)}
-          {audio && ex.audio && (zhVisible || ex.hideZh) && <Speak text={ex.audio} slow onPlay={(rate) => rate < 1 && onAssist('slow')} />}
+          {audio && ex.audio && (zhVisible || ex.hideZh) && !(ex.speak?.selfCheck && !answered) && (
+            <Speak text={ex.audio} slow voice={ex.voice} onPlay={(isSlow) => isSlow && onAssist('slow')} />
+          )}
         </Card>
       )}
 
-      {!answered && !intro && <AnswerInput ex={ex} text={text} setText={setText} tiles={tiles} setTiles={setTiles} onSubmit={onSubmit} submitText={submitText} />}
+      {!answered && !intro && ex.speak && (spoken && ex.speak.selfCheck
+        ? <SelfCheck ex={ex} spoken={spoken} onSubmit={onSubmit} onRetry={() => setSpoken(undefined)} />
+        : <Recorder key={spoken ? 'again' : 'first'} expected={ex.speak.expected} speaker={speaker} onDone={(s) => {
+            setSpoken(s);
+            onSpoken?.(s);
+            if (!ex.speak!.selfCheck) onSubmit({ speech: s.analysis });
+          }} />)}
 
-      {answered && <Feedback ex={ex} result={result!} audio={audio} onOverride={onOverride} />}
+      {!answered && !intro && !ex.speak && <AnswerInput ex={ex} text={text} setText={setText} tiles={tiles} setTiles={setTiles} onSubmit={onSubmit} submitText={submitText} />}
+
+      {answered && <Feedback ex={ex} result={result!} audio={audio} onOverride={onOverride} spoken={spoken} />}
 
       {panel && (
         <Card className="flex flex-col gap-3 bg-indigo-50 ring-indigo-100 dark:bg-slate-900">
@@ -182,34 +235,70 @@ function AnswerInput({ ex, text, setText, tiles, setTiles, onSubmit, submitText 
   );
 }
 
-function Feedback({ ex, result, audio, onOverride }: { ex: Exercise; result: GradeResult; audio: boolean; onOverride?: (correct: boolean) => void }) {
+/** Spoken recall: pitch analysis can't tell which word was said, so the learner compares and judges. */
+function SelfCheck({ ex, spoken, onSubmit, onRetry }: { ex: Exercise; spoken: Spoken; onSubmit: (r: Response) => void; onRetry: () => void }) {
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <div>
+          <div className="text-2xl">{ex.reveal.zh}</div>
+          <div className="text-slate-500">{ex.reveal.pinyin}</div>
+        </div>
+        <Speak text={ex.reveal.zh} slow />
+        <Button variant="secondary" className="px-3 py-2 text-sm" onClick={() => playBlob(spoken.recording.blob)}>▶ Me</Button>
+      </div>
+      <p className="text-sm">Did you say this?</p>
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="bad" onClick={() => onSubmit({ speech: spoken.analysis, self: 'off' })}>No</Button>
+        <Button variant="secondary" onClick={() => onSubmit({ speech: spoken.analysis, self: 'close' })}>Nearly</Button>
+        <Button variant="good" onClick={() => onSubmit({ speech: spoken.analysis, self: 'good' })}>Yes</Button>
+      </div>
+      <button type="button" onClick={onRetry} className="self-start text-sm text-slate-500 underline">Record again</button>
+    </Card>
+  );
+}
+
+function Feedback({ ex, result, audio, onOverride, spoken }: { ex: Exercise; result: GradeResult; audio: boolean; onOverride?: (v: Verdict) => void; spoken?: Spoken }) {
   const tone: Record<string, [string, ReactNode]> = {
     correct: ['bg-emerald-50 ring-emerald-200 dark:bg-emerald-950/40 dark:ring-emerald-900', 'Correct'],
     close: ['bg-amber-50 ring-amber-200 dark:bg-amber-950/40 dark:ring-amber-900', 'Almost'],
     wrong: ['bg-rose-50 ring-rose-200 dark:bg-rose-950/40 dark:ring-rose-900', 'Not quite'],
-    unsure: ['bg-slate-50 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700', 'Compare with the model answer'],
+    unsure: ['bg-slate-50 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700', spoken ? "I couldn't judge that clearly" : 'Compare with the model answer'],
   };
   const [style, title] = tone[result.verdict];
   return (
     <Card className={`flex flex-col gap-2 ${style}`}>
       <div className="font-semibold">{title}</div>
-      {result.notes.map((n) => <p key={n} className="text-sm">{n}</p>)}
-      <div className="flex items-center gap-2">
-        <div>
-          <div className="text-2xl">{ex.reveal.zh}</div>
-          {ex.reveal.pinyin && <div className="text-slate-500">{ex.reveal.pinyin}</div>}
-          {ex.reveal.en && <div>{ex.reveal.en}</div>}
-        </div>
-        {audio && ex.reveal.zh && <Speak text={ex.reveal.zh} slow />}
-      </div>
-      {result.verdict === 'unsure' && onOverride && (
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="bad" onClick={() => onOverride(false)}>I was wrong</Button>
-          <Button variant="good" onClick={() => onOverride(true)}>I was right</Button>
-        </div>
+      {spoken ? <SpeechReview spoken={spoken} native={ex.reveal.zh} /> : (
+        <>
+          {result.notes.map((n) => <p key={n} className="text-sm">{n}</p>)}
+          <div className="flex items-center gap-2">
+            <div>
+              {ex.reveal.zh && <div className="text-2xl">{ex.reveal.zh}</div>}
+              {ex.reveal.pinyin && <div className="text-slate-500">{ex.reveal.pinyin}</div>}
+              {ex.reveal.en && <div>{ex.reveal.en}</div>}
+            </div>
+            {audio && ex.reveal.zh && <Speak text={ex.reveal.zh} slow />}
+          </div>
+        </>
       )}
+      {result.verdict === 'unsure' && onOverride && (spoken ? (
+        <>
+          <p className="text-sm">Listen to both. How close were you?</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="bad" onClick={() => onOverride('wrong')}>Off</Button>
+            <Button variant="secondary" onClick={() => onOverride('close')}>Close</Button>
+            <Button variant="good" onClick={() => onOverride('correct')}>Matched</Button>
+          </div>
+        </>
+      ) : (
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="bad" onClick={() => onOverride('wrong')}>I was wrong</Button>
+          <Button variant="good" onClick={() => onOverride('correct')}>I was right</Button>
+        </div>
+      ))}
       {result.verdict === 'wrong' && onOverride && (ex.accepted || ex.targets) && (
-        <button type="button" onClick={() => onOverride(true)} className="self-start text-sm text-slate-500 underline">My answer was actually right</button>
+        <button type="button" onClick={() => onOverride('correct')} className="self-start text-sm text-slate-500 underline">My answer was actually right</button>
       )}
     </Card>
   );

@@ -114,6 +114,21 @@ unknown-word share, scaffold level). Skill bands shown to the learner are coarse
 (Starting · Beginner · Elementary · Pre-intermediate · Intermediate) with an uncertainty note when
 n < 20 — no fake percentages.
 
+## 5b. Speaking (slice 5)
+
+- Production is judged on the device: YIN pitch → syllables (duration-weighted split, boundaries nudged
+  to energy dips) → each syllable's 5-point contour on the learner's own range (learned from every
+  clear attempt) → nearest tone template. Expected tones are the *pronounced* ones after sandhi.
+- Verdict: all toned syllables right → correct; ≥ half → close; else wrong (category `tone`, so a
+  repeated 2↔3 confusion becomes the same error pattern as in listening). Low confidence or no clear
+  voice → "unsure": the learner compares both recordings and self-assesses.
+- Spoken recall (say it from meaning) can't be verified by pitch alone, so the learner also judges
+  whether it was the right word; their answer caps the verdict.
+- Shadowing and dialogues are practice, not reviews: they move the speaking / listening ability and are
+  logged, but do not touch FSRS.
+- New words in a unit are introduced greedily by how many sentences they make readable (interests
+  break ties), so every early session yields whole sentences to hear, read and shadow.
+
 ## 6. Exercise types
 
 | Type | Primary facet | Format difficulty k |

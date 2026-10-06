@@ -5,7 +5,7 @@ import { gradeEnglish } from '../lib/grade';
 import { updateAbility } from '../lib/learner';
 import { markSyllable } from '../lib/pinyin';
 import { seedKnown, type LearnerState } from '../lib/session';
-import { primeAudio, speak } from '../lib/tts';
+import { primeAudio, speak } from '../lib/audio';
 import type { AssessmentRecord, SkillAbility } from '../lib/types';
 import { Button, Card, Label, Screen, Speak } from './ui';
 

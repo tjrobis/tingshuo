@@ -50,6 +50,7 @@ export const LEXICON = `
 一点|yi1 dian3|a little;a bit|phr|1|core||Said yìdiǎn.
 朋友|peng2 you0|friend|n|1|people,dating|🤝
 小明|xiao3 ming2|Xiaoming|name|5|people
+李华|li3 hua2|Li Hua|name|5|people
 
 # 3
 请|qing3|please;to invite|v|1|repair|🙏
@@ -660,4 +661,93 @@ u-ü|u vs ü|路 lu4|绿 lü4|u: lips rounded, tongue back. ü: say "ee", then r
 n-ng|-n vs -ng|金 jin1|京 jing1|-n: tongue tip touches behind the top teeth. -ng: back of the tongue rises, like "sing".
 an-ang|an vs ang|山 shan1|商 shang1|an: front of the mouth, tongue tip up. ang: back of the mouth, like "ahng".
 r-l|r vs l|热 re4|乐 le4|r: tongue curled back, close to the s in "pleasure". l: tongue tip on the ridge behind the teeth.
+`;
+
+// Listening dialogues. `@ id|unit|title` starts one; `A|zh|en` / `B|zh|en` are lines (tokenised like
+// SENTENCES); `?|question|right answer|wrong|wrong` asks about it (options are shuffled when shown).
+export const DIALOGUES = `
+@ hello|1|Saying hello
+A|你好 ！|Hello!
+B|你好 ！ 你 好 吗 ？|Hi! How are you?
+A|我 很 好 ， 谢谢 。 你 呢 ？|I'm fine, thanks. And you?
+B|我 也 很 好 。|I'm fine too.
+A|你 是 学生 吗 ？|Are you a student?
+B|不 是 ， 我 是 老师 。|No, I'm a teacher.
+?|How is the second speaker?|Fine too|Not very well|Busy
+?|What does the second speaker do?|Teacher|Student|We don't know
+
+@ names|2|Meeting someone
+A|你好 ！ 你 叫 什么 名字 ？|Hi! What's your name?
+B|我 叫 小明 。 你 呢 ？|I'm Xiaoming. And you?
+A|我 叫 李华 。 很 高兴 认识 你 ！|I'm Li Hua. Nice to meet you!
+B|认识 你 很 高兴 。 你 是 哪 国 人 ？|Nice to meet you. Where are you from?
+A|我 是 中国 人 。 你 呢 ？|I'm Chinese. And you?
+B|我 是 美国 人 。|I'm American.
+?|Where is Xiaoming from?|America|China|We don't know
+?|What is the first speaker's name?|Li Hua|Xiaoming|They don't say
+
+@ repair|3|Can you say that again?
+A|你 会 说 中文 吗 ？|Can you speak Chinese?
+B|会 一点 。 请 说 慢 一点 。|A little. Please speak more slowly.
+A|好 。 你 叫 什么 名字 ？|OK. What's your name?
+B|对不起 ， 我 听 不 懂 。 请 再 说 一 遍 。|Sorry, I don't understand. Please say it again.
+A|你 叫 什么 名字 ？|What's your name?
+B|我 叫 小明 。|I'm Xiaoming.
+?|What does the second speaker ask for first?|Speak more slowly|Speak English|Write it down
+?|Did the second speaker understand the question the first time?|No|Yes|They don't say
+
+@ hobbies|5|What do you like?
+A|你 喜欢 什么 ？|What do you like?
+B|我 喜欢 打 游戏 。 你 呢 ？|I like gaming. And you?
+A|我 不 喜欢 打 游戏 。 我 喜欢 爬山 。|I don't like gaming. I like hiking.
+B|爬山 ？ 太 有 意思 了 ！|Hiking? How interesting!
+?|What does the first speaker like?|Hiking|Gaming|Music
+?|What does the second speaker like?|Gaming|Hiking|Movies
+
+@ family|6|Family and pets
+A|你 家 有 几 口 人 ？|How many people are in your family?
+B|四 口 人 ： 爸爸 、 妈妈 、 姐姐 和 我 。|Four: dad, mom, my older sister and me.
+A|你 有 没有 狗 ？|Do you have a dog?
+B|没有 ， 我 有 一 只 猫 。|No, I have a cat.
+?|How many people are in the second speaker's family?|Four|Three|Five
+?|What pet does the second speaker have?|A cat|A dog|No pets
+
+@ ordering|7|At a restaurant
+A|你好 ！ 你 想 吃 什么 ？|Hello! What would you like to eat?
+B|我 要 一 碗 面 。|I'll have a bowl of noodles.
+A|喝 什么 ？|And to drink?
+B|我 要 一 杯 茶 。 这个 菜 辣 不 辣 ？|A cup of tea. Is this dish spicy?
+A|不 辣 。 非常 好吃 ！|It's not spicy. It's really good!
+?|What does the customer order to eat?|A bowl of noodles|Dumplings|Rice
+?|What does the customer drink?|Tea|Coffee|Beer
+
+@ living|10|Where do you live?
+A|你 住 在 哪儿 ？|Where do you live?
+B|我 住 在 上海 。 你 呢 ？|I live in Shanghai. And you?
+A|我 住 在 北京 ， 我 在 大学 工作 。|I live in Beijing, and I work at a university.
+B|你 是 老师 吗 ？|Are you a teacher?
+A|对 ， 我 是 老师 。|Yes, I'm a teacher.
+?|Where does the second speaker live?|Shanghai|Beijing|They don't say
+?|What does the first speaker do?|Teaches at a university|Studies at a university|Works at a company
+
+@ weekend|11|Weekend plans
+A|你 周末 打算 做 什么 ？|What are you planning to do this weekend?
+B|我 打算 去 爬山 。 你 呢 ？|I'm planning to go hiking. And you?
+A|我 还 不 知道 。|I don't know yet.
+B|我们 一起 去 吧 ！|Let's go together!
+A|好 ！ 几 点 ？|OK! What time?
+B|早上 八 点 怎么样 ？|How about eight in the morning?
+A|九 点 吧 。|Let's say nine.
+?|What will they do at the weekend?|Go hiking together|Watch a movie|Stay at home
+?|What time does the first speaker want to meet?|Nine o'clock|Eight o'clock|Ten o'clock
+
+@ directions|12|Finding the restroom
+A|对不起 ， 洗手间 在 哪儿 ？|Excuse me, where's the restroom?
+B|往 左 走 ， 洗手间 在 左边 。|Go left; the restroom is on the left.
+A|远 吗 ？|Is it far?
+B|不 远 ， 很 近 。|No, it's very close.
+A|谢谢 ！|Thanks!
+B|不客气 。|You're welcome.
+?|Where is the restroom?|On the left|On the right|Upstairs
+?|Is it far?|No, it's close|Yes, quite far|They don't say
 `;

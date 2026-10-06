@@ -1,7 +1,7 @@
 // Content validation (LEARNING_ENGINE.md §9): curated Mandarin must pass these before it can be taught.
 import { pinyin, polyphonic } from 'pinyin-pro';
 import { describe, expect, it } from 'vitest';
-import { characters, grammar, sentences, sentenceWords, soundPairs, tonePairWords, toneSets, units, wordById, words } from './curriculum';
+import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, tonePairWords, toneSets, units, wordById, words } from './curriculum';
 import { parseNumbered } from './pinyin';
 import { splitTokenised } from './segment';
 
@@ -135,5 +135,28 @@ describe('characters and pronunciation drills', () => {
     const pairs = tonePairWords();
     const missing = [1, 2, 3, 4].flatMap((a) => [1, 2, 3, 4, 0].map((b) => `${a}-${b}`)).filter((k) => !pairs.get(k)?.length);
     expect(missing).toEqual([]);
+  });
+});
+
+describe('dialogues', () => {
+  it('only use words taught by their unit, and each has lines, translations and questions', () => {
+    expect(dialogues.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(dialogues.map((d) => d.id)).size).toBe(dialogues.length);
+    const problems = dialogues.flatMap((d) =>
+      d.lines.flatMap((l) =>
+        splitTokenised(l.zh).filter((t) => t.kind === 'han').flatMap((t) => {
+          const w = wordById.get(`w:${t.ref}`);
+          if (!w) return [`${d.id}: "${t.ref}" is not in the lexicon`];
+          return w.unit > d.unit ? [`${d.id} (unit ${d.unit}) uses ${t.ref} from unit ${w.unit}`] : [];
+        }),
+      ),
+    );
+    expect(problems).toEqual([]);
+    for (const d of dialogues) {
+      expect(d.lines.length, d.id).toBeGreaterThanOrEqual(4);
+      expect(d.lines.every((l) => (l.speaker === 'A' || l.speaker === 'B') && l.en), d.id).toBe(true);
+      expect(d.questions.length, d.id).toBeGreaterThan(0);
+      for (const q of d.questions) expect(new Set(q.options).size, `${d.id}: ${q.q}`).toBe(3);
+    }
   });
 });

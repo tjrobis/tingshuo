@@ -1,6 +1,6 @@
 // Shared UI primitives. Tailwind only; dark mode follows the system setting.
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
-import { speak } from '../lib/tts';
+import { speak } from '../lib/audio';
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'good' | 'bad' };
 const VARIANTS = {
@@ -51,19 +51,19 @@ const SpeakerIcon = () => (
   </svg>
 );
 
-/** Plays Chinese text. `slow` offers a 0.6× button next to it. */
-export function Speak({ text, slow = false, onPlay }: { text: string; slow?: boolean; onPlay?: (rate: number) => void }) {
-  const play = (rate: number) => {
-    onPlay?.(rate);
-    void speak(text, rate);
+/** Plays Chinese text at the learner's speed. `slow` offers a 0.6× button next to it. */
+export function Speak({ text, slow = false, onPlay, voice }: { text: string; slow?: boolean; onPlay?: (slow: boolean) => void; voice?: number }) {
+  const play = (isSlow: boolean) => {
+    onPlay?.(isSlow);
+    void speak(text, isSlow ? { rate: 0.6, voice } : { voice });
   };
   return (
     <span className="inline-flex gap-1">
-      <button type="button" aria-label="Play audio" onClick={() => play(1)} className="rounded-full p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-slate-800">
+      <button type="button" aria-label="Play audio" onClick={() => play(false)} className="rounded-full p-2 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-slate-800">
         <SpeakerIcon />
       </button>
       {slow && (
-        <button type="button" aria-label="Play slowly" onClick={() => play(0.6)} className="rounded-full px-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-slate-800">
+        <button type="button" aria-label="Play slowly" onClick={() => play(true)} className="rounded-full px-2 text-sm text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-slate-800">
           0.6×
         </button>
       )}

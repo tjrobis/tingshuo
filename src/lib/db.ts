@@ -4,7 +4,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { LearnerState } from './session';
 import type {
-  AssessmentRecord, ErrorRecord, LearningEvent, LessonRecord, MasteryState, ReviewRecord, SkillAbility, SRSState, UserProfile,
+  AssessmentRecord, AudioAsset, ErrorRecord, PronunciationAttempt, LearningEvent, LessonRecord, MasteryState, ReviewRecord, SkillAbility, SRSState, UserProfile,
 } from './types';
 
 export const db = new Dexie('tingshuo') as Dexie & {
@@ -17,6 +17,8 @@ export const db = new Dexie('tingshuo') as Dexie & {
   sessions: EntityTable<LessonRecord, 'id'>;
   abilities: EntityTable<SkillAbility, 'skill'>;
   assessments: EntityTable<AssessmentRecord, 'id'>;
+  pronunciation: EntityTable<PronunciationAttempt, 'id'>;
+  recordings: EntityTable<AudioAsset, 'id'>;
 };
 
 db.version(1).stores({
@@ -30,6 +32,7 @@ db.version(1).stores({
   abilities: 'skill',
   assessments: '++id, at',
 });
+db.version(2).stores({ pronunciation: '++id, at, itemId', recordings: '++id, at' });
 
 /** Everything one learning step changes, written atomically so the model can't half-update. */
 export interface Writes {
@@ -66,6 +69,16 @@ export async function loadState(): Promise<LearnerState | null> {
     abilities: new Map(abilities.map((x) => [x.skill, x])),
     reviews, errors, sessions, answers,
   };
+}
+
+/** Store a pronunciation attempt and its recording, keeping only the newest `keep` recordings. */
+export async function savePronunciation(attempt: PronunciationAttempt, recording: Omit<AudioAsset, 'id'> | undefined, keep: number) {
+  await db.transaction('rw', [db.pronunciation, db.recordings], async () => {
+    const recordingId = recording && keep > 0 ? await db.recordings.add(recording) : undefined;
+    await db.pronunciation.add({ ...attempt, recordingId });
+    const stale = await db.recordings.orderBy('at').reverse().offset(keep).primaryKeys();
+    await db.recordings.bulkDelete(stale);
+  });
 }
 
 /** Ask the browser not to evict our data (Safari otherwise may after 7 idle days). */

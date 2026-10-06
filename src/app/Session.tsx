@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { db, persist } from '../lib/db';
+import { db, persist, savePronunciation } from '../lib/db';
 import { expectedOf, gradeExercise, makeExercise, type Exercise, type Response } from '../lib/exercise';
-import type { GradeResult } from '../lib/grade';
+import type { GradeResult, Verdict } from '../lib/grade';
+import { toAttempt, updateSpeaker } from '../lib/pitch';
 import { adaptScaffold, planSession } from '../lib/planner';
-import { applyAnswer, buildQueue, commit, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
+import { applyAnswer, applyPractice, buildQueue, commit, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
 import { State } from '../lib/srs';
 import { ExerciseView } from './Exercise';
+import type { Spoken } from './Recorder';
 import { Bar, Button, Card, Label, Screen } from './ui';
 
 interface Logged {
@@ -15,7 +17,7 @@ interface Logged {
 }
 
 const insert = (q: Slot[], at: number, s: Slot) => [...q.slice(0, at), s, ...q.slice(at)];
-const describe = (r: Response, ex: Exercise) => ('choice' in r ? ex.choices![r.choice].label : 'order' in r ? r.order.join('') : r.text);
+const describe = (r: Response, ex: Exercise) => ('choice' in r ? ex.choices![r.choice].label : 'order' in r ? r.order.join('') : 'speech' in r ? `(spoken${r.self ? `, self: ${r.self}` : ''})` : r.text);
 
 export function Session({ state, minutes, audio, onExit }: { state: LearnerState; minutes: number; audio: boolean; onExit: () => void }) {
   const [plan] = useState(() => planSession(planInput(state, minutes, new Date(), audio)));
@@ -52,7 +54,7 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
   // The next slot that yields an exercise (slots can become moot, e.g. a facet not unlocked).
   const current = useMemo(() => {
     for (let i = index; i < queue.length; i++) {
-      const ex = makeExercise(state, queue[i], { now: new Date(), audio, scaffold: scaffold.current });
+      const ex = makeExercise(state, queue[i], { now: new Date(), audio, mic: !!state.profile.micAvailable, scaffold: scaffold.current });
       if (ex) return { ex, i };
     }
     return null;
@@ -87,8 +89,22 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
     setResult(gradeExercise(current.ex, r));
   }
 
-  function override(correct: boolean) {
-    setResult((r) => r && { ...r, verdict: correct ? 'correct' : 'wrong', category: correct ? undefined : r.category ?? 'other', notes: correct ? ['Marked correct by you.'] : r.notes });
+  function override(verdict: Verdict) {
+    setResult((r) => r && { ...r, verdict, category: verdict === 'correct' ? undefined : r.category ?? 'other', notes: verdict === 'correct' ? ['Marked correct by you.'] : r.notes });
+  }
+
+  /** Keep every analysed attempt (and learn the voice range), whatever verdict follows. */
+  function spoken({ analysis, frames, recording }: Spoken) {
+    if (!current?.ex.speak) return;
+    const { ex } = current;
+    const now = Date.now();
+    void savePronunciation(toAttempt(ex.itemId, ex.reveal.zh, ex.speak!.expected, analysis, now),
+      { at: now, kind: 'learner', mime: recording.blob.type, blob: recording.blob, durationMs: recording.durationMs, itemId: ex.itemId }, state.profile.privacy.keepRecordings);
+    const speaker = updateSpeaker(state.profile.speaker, frames);
+    if (speaker !== state.profile.speaker) {
+      state.profile.speaker = speaker;
+      void db.profile.update('me', { speaker });
+    }
   }
 
   function assist(kind: 'confused' | 'why' | 'pinyin' | 'slow') {
@@ -109,13 +125,15 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
       void persist(w);
       introduced.current++;
     } else if (result) {
-      const { writes, unlocked } = applyAnswer(state, {
-        slot: ex.slot, facet: ex.facet!, format: ex.format, result, rtMs: rt.current, assisted: assisted.current,
-        given, expected: expectedOf(ex), context: ex.context, sessionId: sessionId.current,
-      }, at);
+      const correct = result.verdict === 'correct' || result.verdict === 'close';
+      const { writes, unlocked } = ex.slot.practice
+        ? { writes: applyPractice(state, { slot: ex.slot, correct, level: ex.level ?? 0, rtMs: rt.current, given, expected: expectedOf(ex), sessionId: sessionId.current }, at), unlocked: [] }
+        : applyAnswer(state, {
+            slot: ex.slot, facet: ex.facet!, format: ex.format, result, rtMs: rt.current, assisted: assisted.current,
+            given, expected: expectedOf(ex), context: ex.context, sessionId: sessionId.current,
+          }, at);
       commit(state, writes);
       void persist(writes);
-      const correct = result.verdict === 'correct' || result.verdict === 'close';
       recent.current = [...recent.current, correct];
       scaffold.current = adaptScaffold(recent.current, scaffold.current);
       setLog((l) => [...l, { ex, result, given }]);
@@ -152,7 +170,7 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
         <div className="flex-1"><Bar value={progress} /></div>
         <span className="text-sm text-slate-500 tabular-nums">{Math.max(0, Math.ceil(minutes - (now - started.current) / 60_000))} min</span>
       </div>
-      <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} />
+      <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} />
     </Screen>
   );
 }

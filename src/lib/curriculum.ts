@@ -1,10 +1,10 @@
 // Parses the curated tables in src/data/curriculum.ts into typed, indexed content.
 
-import { CHARACTERS, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, TONE_SETS, UNITS } from '../data/curriculum';
+import { CHARACTERS, DIALOGUES, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, TONE_SETS, UNITS } from '../data/curriculum';
 import type { ChineseTarget } from './grade';
 import { formatWord, parseNumbered, surfaceTones, type Syllable } from './pinyin';
 import { splitTokenised } from './segment';
-import type { CharacterInfo, GrammarConcept, Sentence, Unit, VocabularyItem } from './types';
+import type { CharacterInfo, Dialogue, GrammarConcept, Sentence, Unit, VocabularyItem } from './types';
 
 /** Pipe-table rows, each tagged with the unit of the latest `# N` header. */
 function rows(table: string): { unit: number; cols: string[] }[] {
@@ -98,6 +98,14 @@ export const soundPairs = rows(SOUND_PAIRS).map(({ cols: [id, label, a, b, tip] 
     return { char, pinyin };
   }),
 }));
+
+export const dialogues: Dialogue[] = [];
+for (const { cols } of rows(DIALOGUES)) {
+  const [tag, a, b, ...rest] = cols;
+  if (tag.startsWith('@ ')) dialogues.push({ id: `d:${tag.slice(2)}`, unit: Number(a), title: b, lines: [], questions: [] });
+  else if (tag === '?') dialogues[dialogues.length - 1].questions.push({ q: a, options: [b, ...rest], answer: 0 });
+  else dialogues[dialogues.length - 1].lines.push({ speaker: tag as 'A' | 'B', zh: a, en: b });
+}
 
 /** Two-syllable words grouped by citation tones ("3-0" → 我们, 姐姐…), for tone-pair drills. */
 export function tonePairWords(): Map<string, VocabularyItem[]> {
