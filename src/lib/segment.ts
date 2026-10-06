@@ -38,23 +38,18 @@ export function segment(text: string, has: (word: string) => boolean): Token[] {
       tokens.push(kind === 'han' ? { text: word, kind, ref: word } : { text: word, kind });
       continue;
     }
-    // Longest lexicon match left to right; unknown characters stay glued together as one word.
+    // Split by longest lexicon match only if every piece is a known word (去了 = 去 + 了); otherwise
+    // trust ICU and keep it whole: 熊猫 (panda) is one unknown word, not unknown 熊 + known 猫.
     const chars = Array.from(word);
-    let unknown = '';
+    const pieces: string[] = [];
     for (let i = 0; i < chars.length; ) {
       let len = chars.length - i;
-      while (len > 0 && !has(chars.slice(i, i + len).join(''))) len--;
-      if (!len) {
-        unknown += chars[i++];
-        continue;
-      }
-      if (unknown) tokens.push({ text: unknown, kind });
-      unknown = '';
-      const w = chars.slice(i, i + len).join('');
-      tokens.push({ text: w, kind, ref: w });
+      while (len > 1 && !has(chars.slice(i, i + len).join(''))) len--;
+      pieces.push(chars.slice(i, i + len).join(''));
       i += len;
     }
-    if (unknown) tokens.push({ text: unknown, kind });
+    if (pieces.every(has)) tokens.push(...pieces.map((w) => ({ text: w, kind, ref: w })));
+    else tokens.push({ text: word, kind });
   }
   return tokens;
 }

@@ -71,7 +71,8 @@ debt ledger instead of rotting. Modules are single files until they genuinely ou
 src/
   main.tsx, index.css                  entry, Tailwind v4 (light/dark follows the system)
   app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session,
-                 Pronunciation (tone-pair grid trainer), Settings, Recorder (recording, contour plot, review)
+                 Pronunciation (tone-pair grid trainer), Settings (incl. AI provider), Recorder (recording,
+                 contour plot, review), Tutor (AI conversation, review, offline roleplay)
                  (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
@@ -90,7 +91,8 @@ src/
     audio.ts       speech synthesis (Chinese-voice detection, voice choice, speed, speaker variety) and
                    recording (MediaRecorder → decoded PCM), all on device
     pitch.ts       YIN pitch tracking, per-syllable tone diagnosis + feedback, rhythm, voice-range learning
-    (planned) audio pitch analysis, ai/…                                                 [slices 5–9]
+    ai.ts          provider adapters (Anthropic SDK lazy-loaded, OpenAI/compatible, Gemini) + error mapping
+    tutor.ts       tutor prompts, reply parsing/validation, local pinyin, corrections → errors, request log
 ```
 
 Grows only when a slice needs it; this block is updated as files land.

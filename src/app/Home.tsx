@@ -1,3 +1,4 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { units, words } from '../lib/curriculum';
 import { db } from '../lib/db';
@@ -17,7 +18,7 @@ const SKILL_NAMES: Record<string, string> = {
 const approx = (n: number) => (n < 20 ? Math.round(n) : Math.round(n / 5) * 5);
 
 export function Home({ state, audio, onLearn, onOpen }: {
-  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings') => void;
+  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings' | 'tutor') => void;
 }) {
   const [minutes, setMinutes] = useState(state.profile.sessionMinutes);
   const [why, setWhy] = useState(false);
@@ -30,6 +31,7 @@ export function Home({ state, audio, onLearn, onOpen }: {
   const today = finished.filter((s) => new Date(s.startedAt).toDateString() === now.toDateString()).reduce((m, s) => m + s.stats.minutes, 0);
   const days = streak(finished.filter((s) => s.stats.minutes >= 1).map((s) => s.startedAt), +now);
   const retention = trueRetention(state.reviews, +now);
+  const talked = (useLiveQuery(() => db.conversations.where('startedAt').above(+now - 7 * 86_400_000).toArray(), []) ?? []).reduce((m, c) => m + c.minutes, 0);
 
   const statuses = new Map<string, MasteryStatus>(
     [...state.mastery.keys()].filter((id) => ITEMS.has(id)).map((id) => [id, masteryStatus(ITEMS.get(id)!.kind, facetsOf(state, id), now)]),
@@ -66,6 +68,7 @@ export function Home({ state, audio, onLearn, onOpen }: {
         </div>
         <div className="flex items-center gap-1">
           {days > 0 && <div className="mr-2 text-right text-sm text-slate-500"><span className="text-xl font-semibold text-slate-900 dark:text-slate-100">{days}</span> day streak</div>}
+          <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('tutor')}>Talk</Button>
           <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('pronunciation')}>Pronunciation</Button>
           <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('settings')} aria-label="Settings">⚙</Button>
         </div>
@@ -134,6 +137,7 @@ export function Home({ state, audio, onLearn, onOpen }: {
           <span className="text-slate-500">{retention.rate === null ? `not enough data yet (${retention.n}/10 reviews)` : `${Math.round(retention.rate * 100)}% of ${retention.n} reviews`}</span>
         </div>
         <div className="flex justify-between text-sm"><span>Learned this week and holding</span><span className="text-slate-500">{velocity}</span></div>
+        <div className="flex justify-between text-sm"><span>Conversation this week</span><span className="text-slate-500">{Math.round(talked)} min</span></div>
       </Card>
 
       {skills.length > 0 && (

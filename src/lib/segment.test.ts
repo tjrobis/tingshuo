@@ -21,6 +21,12 @@ describe('segment', () => {
     expect(texts('我昨天去了商店', lexicon('我', '昨天', '去', '了', '商店'))).toEqual(['我', '昨天', '去', '了', '商店']);
   });
 
+  it('does not split an unknown word into a known half (coverage would be overstated)', () => {
+    const toks = segment('我喜欢熊猫', lexicon('我', '喜欢', '猫'));
+    expect(toks.map((t) => t.text)).toEqual(['我', '喜欢', '熊猫']);
+    expect(toks[2].ref).toBeUndefined();
+  });
+
   it('keeps unknown words whole instead of shattering them', () => {
     const toks = segment('我喜欢咖啡', lexicon('我', '喜欢'));
     expect(toks.map((t) => t.text)).toEqual(['我', '喜欢', '咖啡']);

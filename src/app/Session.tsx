@@ -6,6 +6,7 @@ import { toAttempt, updateSpeaker } from '../lib/pitch';
 import { adaptScaffold, planSession } from '../lib/planner';
 import { applyAnswer, applyPractice, buildQueue, commit, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
 import { State } from '../lib/srs';
+import { aiReady, ask, explainRequest, tutorContext } from '../lib/tutor';
 import { ExerciseView } from './Exercise';
 import type { Spoken } from './Recorder';
 import { Bar, Button, Card, Label, Screen } from './ui';
@@ -37,6 +38,8 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
   const rt = useRef(0);
   const failures = useRef(new Map<string, number>());
   const introduced = useRef(0);
+  const [aiOn, setAiOn] = useState(false);
+  useEffect(() => void aiReady(state.profile).then(setAiOn), [state]);
 
   const created = useRef(false);
   useEffect(() => {
@@ -170,7 +173,8 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
         <div className="flex-1"><Bar value={progress} /></div>
         <span className="text-sm text-slate-500 tabular-nums">{Math.max(0, Math.ceil(minutes - (now - started.current) / 60_000))} min</span>
       </div>
-      <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} />
+      <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} stt={state.profile.privacy.stt}
+        explain={aiOn ? () => ask(state.profile, explainRequest(current.ex, tutorContext(state), result ? { given, result } : undefined)) : undefined} />
     </Screen>
   );
 }

@@ -155,3 +155,16 @@ export function errorPatterns(errors: ErrorRecord[], drillWins: { key: string; a
     };
   });
 }
+
+/** Share of the expected Chinese characters a recogniser heard, in order (longest common subsequence). */
+export function charOverlap(expected: string, heard: string): number {
+  const [a, b] = [Array.from(expected.replace(/[^\p{Script=Han}]/gu, '')), Array.from(heard.replace(/[^\p{Script=Han}]/gu, ''))];
+  if (!a.length) return 0;
+  let row = new Array(b.length + 1).fill(0);
+  for (const x of a) {
+    const next = [0];
+    for (let j = 1; j <= b.length; j++) next[j] = x === b[j - 1] ? row[j - 1] + 1 : Math.max(row[j], next[j - 1]);
+    row = next;
+  }
+  return row[b.length] / a.length;
+}

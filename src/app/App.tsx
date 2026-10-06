@@ -9,8 +9,9 @@ import { Placement } from './Placement';
 import { Pronunciation } from './Pronunciation';
 import { Session } from './Session';
 import { Settings } from './Settings';
+import { Tutor } from './Tutor';
 
-type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' };
+type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' } | { name: 'tutor' };
 
 export default function App() {
   const [state, setState] = useState<LearnerState | null>();
@@ -44,6 +45,8 @@ export default function App() {
       return <Session state={state} minutes={view.minutes} audio={audio} onExit={home} />;
     case 'pronunciation':
       return <Pronunciation state={state} audio={audio} onProfile={updateProfile} onBack={home} />;
+    case 'tutor':
+      return <Tutor state={state} audio={audio} onBack={home} />;
     case 'settings':
       return <Settings profile={state.profile} onChange={updateProfile} onBack={home} />;
     default:
@@ -52,7 +55,7 @@ export default function App() {
           state={state}
           audio={audio}
           onLearn={(minutes) => setView({ name: 'session', minutes })}
-          onOpen={(name) => setView(name === 'settings' ? { name: 'settings' } : { name: 'pronunciation' })}
+          onOpen={(name) => setView({ name } as View)}
         />
       );
   }

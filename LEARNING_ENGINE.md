@@ -253,6 +253,22 @@ AI-generated content:
    added to practice only as `source: 'generated'`, `verified: false`.
 4. Generated text is stored in `generated` with `validation` results and never merged into curated data.
 
+## 9b. AI tutor (slice 6)
+
+- The system prompt carries only what the learner model knows: taught words, introduced grammar,
+  recurring mistakes and at-risk words, plus the mode's rules and the scenario. New words per reply are
+  capped (1, or 3 in Challenge mode).
+- Every reply is checked on the device: segmented against the lexicon, unknown words counted. Over the
+  cap → one rewrite request naming the words; anything still unknown is shown flagged, with the
+  model's gloss labelled unverified. Pinyin is computed locally: lexicon pinyin for known words,
+  pinyin-pro for the rest. Nothing the model says becomes curriculum.
+- Corrections are kept per learner message (shown inline in Learning mode, otherwise at the end) and
+  become error-bank records; where the fix is a one-word substitution they are tied to lexicon items, so
+  repeats surface as patterns and get drilled.
+- "I'm confused" can ask the provider for a different explanation, constrained to known words.
+- With no provider: offline roleplay of the curated dialogues (learner plays speaker B, self-checks
+  against the model line), logged as speaking practice.
+
 ## 10. Comprehensible input targeting
 
 - Coverage = known tokens / content tokens (punctuation and declared names excluded); a token is

@@ -73,7 +73,7 @@ placeholder; limited features say so in the UI.
 | Offline | PWA; reviews, lessons, dictionary, progress offline | ✅ (TTS voice availability depends on device) |
 | Debug | Hidden dashboard: learner model, SRS table, planner decisions, AI log, validation report | ✅ |
 | Sync | Multi-device sync | ⏳ (export/import is the interim path) |
-| STT | Speech-to-text for intelligibility/segmental feedback | ⏳ Slice 6: optional AI-provider transcription (works in iOS home-screen apps; browser STT does not, and sends audio to Google/Apple) |
+| STT | Speech-to-text for intelligibility/segmental feedback | 🟡 Opt-in browser speech recognition (voice chat, clarity scores); not available in iPhone home-screen apps, where keyboard dictation works instead |
 
 ## 6. Deliberate deviations from the original brief (and why)
 

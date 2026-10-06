@@ -101,3 +101,48 @@ export function playBlob(blob: Blob): void {
   a.onended = () => URL.revokeObjectURL(url);
   void a.play();
 }
+
+// ───────────── Speech recognition (opt-in) ─────────────
+// The browser sends this audio to its vendor (Google in Chrome, Apple in Safari), so it is off unless
+// the learner turns it on, and it isn't available in iPhone home-screen apps at all.
+interface Recognition {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: ((e: unknown) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+type RecognitionCtor = new () => Recognition;
+const recognitionCtor = (): RecognitionCtor | undefined => {
+  const w = globalThis as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+};
+
+export const sttSupported = () => !!recognitionCtor();
+
+/** Listen in Mandarin until `stop()`; resolves with what was heard ('' if nothing or unsupported). */
+export function listen(): { heard: Promise<string>; stop: () => void } {
+  const Ctor = recognitionCtor();
+  if (!Ctor) return { heard: Promise.resolve(''), stop: () => undefined };
+  const r = new Ctor();
+  r.lang = 'zh-CN';
+  r.continuous = true;
+  r.interimResults = false;
+  let text = '';
+  const heard = new Promise<string>((resolve) => {
+    r.onresult = (e) => {
+      text = Array.from(e.results, (res) => res[0].transcript).join('');
+    };
+    r.onerror = () => resolve(text);
+    r.onend = () => resolve(text);
+  });
+  try {
+    r.start();
+  } catch {
+    return { heard: Promise.resolve(''), stop: () => undefined };
+  }
+  return { heard, stop: () => r.stop() };
+}

@@ -53,12 +53,14 @@ export const sentenceWords = (s: Sentence): string[] =>
 const wordSyllables = (ref: string): Syllable[] => parseNumbered(wordById.get(`w:${ref}`)!.pinyin);
 
 /** Display pinyin for tokenised text, one orthographic word per token: "Nǐ hǎo ma?" style spacing. */
-export const pinyinText = (zh: string): string =>
-  splitTokenised(zh)
-    .map((t) => (t.kind === 'han' ? formatWord(wordSyllables(t.ref!)) : t.text))
+export const pinyinText = (zh: string): string => joinPinyin(splitTokenised(zh).map((t) => (t.kind === 'han' ? formatWord(wordSyllables(t.ref!)) : t.text)));
+
+/** Join per-word pinyin with spaces, Chinese punctuation turned ASCII and attached to the word before. */
+export const joinPinyin = (parts: string[]): string =>
+  parts
     .join(' ')
-    .replace(/[，。？！、]/g, (c) => ({ '，': ',', '。': '.', '？': '?', '！': '!', '、': ',' })[c]!)
-    .replace(/ ([,.?!])/g, '$1');
+    .replace(/[，。？！、：]/g, (c) => ({ '，': ',', '。': '.', '？': '?', '！': '!', '、': ',', '：': ':' })[c]!)
+    .replace(/ ([,.?!:])/g, '$1');
 
 /** What a learner must produce for tokenised text (a word key like "你好" works too). */
 export function targetFor(zh: string): ChineseTarget {

@@ -17,6 +17,10 @@ interface Props {
   /** Hints, slow audio, revealed pinyin, help panels: the answer then counts as assisted. */
   onAssist: (kind: 'confused' | 'why' | 'pinyin' | 'slow') => void;
   speaker?: Speaker;
+  /** Speech recognition opted in (clarity scores). */
+  stt?: boolean;
+  /** "I'm confused" → ask the AI for a different explanation (only when AI is set up). */
+  explain?: () => Promise<string>;
   /** A recording was analysed (saved even if the learner later overrides the verdict). */
   onSpoken?: (s: Spoken) => void;
 }
@@ -27,7 +31,8 @@ const Chinese = ({ text, highlight, className = 'text-4xl' }: { text: string; hi
   return <span className={className}>{before}<mark className="rounded-lg bg-amber-200/70 px-0.5 text-inherit dark:bg-amber-500/30">{highlight}</mark>{rest.join(highlight)}</span>;
 };
 
-export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverride, onAssist, speaker, onSpoken }: Props) {
+export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverride, onAssist, speaker, onSpoken, stt, explain }: Props) {
+  const [aiText, setAiText] = useState('');
   const [text, setText] = useState('');
   const [tiles, setTiles] = useState<number[]>([]);
   const [pinyinShown, setPinyinShown] = useState(false);
@@ -148,7 +153,7 @@ export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverri
 
       {!answered && !intro && ex.speak && (spoken && ex.speak.selfCheck
         ? <SelfCheck ex={ex} spoken={spoken} onSubmit={onSubmit} onRetry={() => setSpoken(undefined)} />
-        : <Recorder key={spoken ? 'again' : 'first'} expected={ex.speak.expected} speaker={speaker} onDone={(s) => {
+        : <Recorder key={spoken ? 'again' : 'first'} expected={ex.speak.expected} speaker={speaker} stt={stt} text={ex.reveal.zh} onDone={(s) => {
             setSpoken(s);
             onSpoken?.(s);
             if (!ex.speak!.selfCheck) onSubmit({ speech: s.analysis });
@@ -171,6 +176,9 @@ export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverri
               )}
               {ex.help.notes.map((n) => <p key={n} className="text-sm">{n}</p>)}
               {audio && ex.audio && <div className="flex items-center gap-2 text-sm">Hear it slowly: <Speak text={ex.audio} slow /></div>}
+              {explain && (aiText
+                ? <p className="text-sm whitespace-pre-line">{aiText}</p>
+                : <Button variant="secondary" onClick={() => { setAiText('Thinking…'); explain().then(setAiText, (e: Error) => setAiText(e.message)); }}>Explain it another way (AI)</Button>)}
             </>
           )}
         </Card>
@@ -247,6 +255,7 @@ function SelfCheck({ ex, spoken, onSubmit, onRetry }: { ex: Exercise; spoken: Sp
         <Speak text={ex.reveal.zh} slow />
         <Button variant="secondary" className="px-3 py-2 text-sm" onClick={() => playBlob(spoken.recording.blob)}>▶ Me</Button>
       </div>
+      {spoken.heard !== undefined && <p className="text-sm text-slate-500">Speech recognition heard: {spoken.heard || '(nothing)'}</p>}
       <p className="text-sm">Did you say this?</p>
       <div className="grid grid-cols-3 gap-2">
         <Button variant="bad" onClick={() => onSubmit({ speech: spoken.analysis, self: 'off' })}>No</Button>

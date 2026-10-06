@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { micSupported, playBlob, startRecording, type Recording } from '../lib/audio';
+import { listen, micSupported, playBlob, startRecording, sttSupported, type Recording } from '../lib/audio';
+import { charOverlap } from '../lib/grade';
 import { markSyllable } from '../lib/pinyin';
 import { analyzeTones, pitchTrack, toneShape, type ExpectedSpeech, type Frame, type Speaker, type ToneAnalysis } from '../lib/pitch';
 import { Button, Speak } from './ui';
@@ -8,14 +9,21 @@ export interface Spoken {
   analysis: ToneAnalysis;
   frames: Frame[];
   recording: Recording;
+  /** What speech recognition heard (only when the learner opted in). */
+  heard?: string;
+  /** Share of the expected characters recognised: a proxy for how intelligible it was. */
+  clarity?: number;
 }
 
 /** Tap to record, tap to stop (auto-stops). Analysis runs on the device. */
-export function Recorder({ expected, speaker, onDone }: { expected: ExpectedSpeech; speaker?: Speaker; onDone: (r: Spoken) => void }) {
+export function Recorder({ expected, speaker, onDone, stt, text }: {
+  expected: ExpectedSpeech; speaker?: Speaker; onDone: (r: Spoken) => void; stt?: boolean; text?: string;
+}) {
   const [state, setState] = useState<'idle' | 'recording' | 'working'>('idle');
   const [error, setError] = useState('');
   const handle = useRef<Awaited<ReturnType<typeof startRecording>> | undefined>(undefined);
   const timer = useRef<number | undefined>(undefined);
+  const recognizer = useRef<ReturnType<typeof listen> | undefined>(undefined);
 
   useEffect(() => () => {
     clearTimeout(timer.current);
@@ -26,6 +34,7 @@ export function Recorder({ expected, speaker, onDone }: { expected: ExpectedSpee
     setError('');
     try {
       handle.current = await startRecording();
+      recognizer.current = stt && sttSupported() ? listen() : undefined;
       setState('recording');
       timer.current = window.setTimeout(() => void stop(), 1500 + 700 * expected.syllables.length);
     } catch {
@@ -37,12 +46,16 @@ export function Recorder({ expected, speaker, onDone }: { expected: ExpectedSpee
     clearTimeout(timer.current);
     const h = handle.current;
     handle.current = undefined;
+    const r = recognizer.current;
+    recognizer.current = undefined;
+    r?.stop();
     if (!h) return;
     setState('working');
     try {
       const recording = await h.stop();
       const frames = pitchTrack(recording.pcm, recording.sampleRate);
-      onDone({ analysis: analyzeTones(frames, expected, speaker), frames, recording });
+      const heard = r ? await Promise.race([r.heard, new Promise<string>((ok) => setTimeout(() => ok(''), 2000))]) : undefined;
+      onDone({ analysis: analyzeTones(frames, expected, speaker), frames, recording, heard, clarity: heard !== undefined && text ? charOverlap(text, heard) : undefined });
     } catch {
       setError("Couldn't read that recording. Try again.");
     }
@@ -116,8 +129,9 @@ export function SpeechReview({ spoken, native }: { spoken: Spoken; native: strin
       <div className="grid grid-cols-3 gap-2 text-center text-sm">
         <div><div className="font-semibold">{a.toneScore === null ? '–' : `${toned.filter((s) => s.detected === s.expected).length}/${toned.length}`}</div><div className="text-slate-500">tones</div></div>
         <div><div className="font-semibold">{a.rhythmScore === null ? '–' : a.rhythmScore >= 0.99 ? 'Good' : 'Check'}</div><div className="text-slate-500">rhythm</div></div>
-        <div><div className="font-semibold">–</div><div className="text-slate-500" title="Needs speech recognition (coming with the AI slice)">clarity: not measured</div></div>
+        <div><div className="font-semibold">{spoken.clarity === undefined ? '–' : `${Math.round(spoken.clarity * 100)}%`}</div><div className="text-slate-500">{spoken.clarity === undefined ? 'clarity: not measured' : 'clarity'}</div></div>
       </div>
+      {spoken.heard !== undefined && <p className="text-sm text-slate-500">Speech recognition heard: {spoken.heard || '(nothing)'}</p>}
       {a.feedback.map((f) => <p key={f} className="text-sm">{f}</p>)}
       {a.ok && a.confidence < 0.3 && <p className="text-xs text-slate-500">Low confidence: background noise or a quiet voice makes pitch hard to read.</p>}
       <div className="flex flex-wrap items-center gap-2">
