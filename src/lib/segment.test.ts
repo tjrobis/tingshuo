@@ -27,6 +27,11 @@ describe('segment', () => {
     expect(toks[2].ref).toBeUndefined();
   });
 
+  it('rejoins pieces ICU splits when together they are a lexicon word (names like 李华)', () => {
+    expect(texts('李华有一只猫。', lexicon('李华', '有', '一', '只', '猫'))).toEqual(['李华', '有', '一', '只', '猫', '。']);
+    expect(texts('我喜欢熊猫', lexicon('我', '喜欢', '猫'))).toEqual(['我', '喜欢', '熊猫']); // known runs untouched
+  });
+
   it('keeps unknown words whole instead of shattering them', () => {
     const toks = segment('我喜欢咖啡', lexicon('我', '喜欢'));
     expect(toks.map((t) => t.text)).toEqual(['我', '喜欢', '咖啡']);

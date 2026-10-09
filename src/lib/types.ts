@@ -2,6 +2,7 @@
 // for semantics. Curated content types are read-only data bundled with the app.
 
 import type { Card } from 'ts-fsrs';
+import type { Token } from './segment';
 
 export type ItemKind = 'word' | 'char' | 'grammar' | 'tone' | 'tonepair' | 'sound';
 
@@ -117,15 +118,22 @@ export interface Dialogue {
   questions: Question[];
 }
 
+export interface StoryLine {
+  tokens: Token[];
+  en: string;
+}
+
+/** A graded reading text: curated (st:<slug>) or AI-written (ai:<n>). */
 export interface Story {
   id: string;
   title: string;
   titleZh: string;
   unit: number;
   topics: string[];
-  paragraphs: string[][]; // tokenised sentences
-  translation: string[][];
+  paragraphs: StoryLine[][];
   questions: Question[];
+  /** AI-written: never curriculum. Glosses for words outside the course are the model's, unverified. */
+  ai?: { glosses: Record<string, string>; validation: ValidationReport };
 }
 
 export interface Unit {
@@ -186,10 +194,12 @@ export interface Interest {
 }
 
 export interface FocusBoost {
-  kind: 'skill' | 'topic';
+  /** 'item': "practise this" from the reader; done once the item is answered after `since`. */
+  kind: 'skill' | 'topic' | 'item';
   key: string;
   factor: number;
   until: number; // epoch ms
+  since?: number;
 }
 
 export type AIProviderId = 'none' | 'anthropic' | 'openai' | 'gemini' | 'openai-compatible';

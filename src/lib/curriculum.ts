@@ -1,10 +1,10 @@
 // Parses the curated tables in src/data/curriculum.ts into typed, indexed content.
 
-import { CHARACTERS, DIALOGUES, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, TONE_SETS, UNITS } from '../data/curriculum';
+import { CHARACTERS, DIALOGUES, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, STORIES, TONE_SETS, UNITS } from '../data/curriculum';
 import type { ChineseTarget } from './grade';
 import { formatWord, parseNumbered, surfaceTones, type Syllable } from './pinyin';
 import { splitTokenised } from './segment';
-import type { CharacterInfo, Dialogue, GrammarConcept, Sentence, Unit, VocabularyItem } from './types';
+import type { CharacterInfo, Dialogue, GrammarConcept, Sentence, Story, Unit, VocabularyItem } from './types';
 
 /** Pipe-table rows, each tagged with the unit of the latest `# N` header. */
 function rows(table: string): { unit: number; cols: string[] }[] {
@@ -107,6 +107,16 @@ for (const { cols } of rows(DIALOGUES)) {
   if (tag.startsWith('@ ')) dialogues.push({ id: `d:${tag.slice(2)}`, unit: Number(a), title: b, lines: [], questions: [] });
   else if (tag === '?') dialogues[dialogues.length - 1].questions.push({ q: a, options: [b, ...rest], answer: 0 });
   else dialogues[dialogues.length - 1].lines.push({ speaker: tag as 'A' | 'B', zh: a, en: b });
+}
+
+export const stories: Story[] = [];
+for (const { cols } of rows(STORIES)) {
+  const [tag, a, b, ...rest] = cols;
+  const st = stories[stories.length - 1];
+  if (tag.startsWith('@ ')) stories.push({ id: `st:${tag.slice(2)}`, unit: Number(a), title: b, titleZh: surface(rest[0]), topics: rest[1].split(','), paragraphs: [[]], questions: [] });
+  else if (tag === '¶') st.paragraphs.push([]);
+  else if (tag === '?') st.questions.push({ q: a, options: [b, ...rest], answer: 0 });
+  else st.paragraphs[st.paragraphs.length - 1].push({ tokens: splitTokenised(tag), en: a });
 }
 
 /** Two-syllable words grouped by citation tones ("3-0" → 我们, 姐姐…), for tone-pair drills. */

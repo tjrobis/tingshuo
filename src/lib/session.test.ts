@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { sentences, sentenceWords } from './curriculum';
+import { sentences, sentenceWords, stories, words } from './curriculum';
 import { db, loadState, persist } from './db';
 import { gradeExercise, gradeSpeech, makeExercise, type Exercise, type Response } from './exercise';
 import type { ToneAnalysis } from './pitch';
 import { formatNumbered } from './pinyin';
 import { planSession } from './planner';
 import {
-  applyAnswer, applyPractice, buildQueue, commit, emptyState, introduce, ITEMS, newCandidates, newProfile, planInput, PRONUNCIATION_ORDER, seedKnown,
+  applyAnswer, applyLookup, applyPractice, buildQueue, commit, coverageTarget, emptyState, introduce, ITEMS, newCandidates, newProfile, nextStory, planInput, PRONUNCIATION_ORDER, seedKnown, storyCoverage,
   type LearnerState, type Slot,
 } from './session';
-import { State } from './srs';
+import { Rating, State } from './srs';
 
 const DAY = 86_400_000;
 const start = new Date('2026-10-05T09:00:00');
@@ -287,5 +287,81 @@ describe('speaking and listening practice', () => {
     expect(gradeSpeech({ ...heard(ex), ok: false }).verdict).toBe('unsure');
     expect(gradeSpeech(heard(ex), 'off').verdict).toBe('wrong');
     expect(gradeSpeech(heard(ex, false), 'good').verdict).toBe('close');
+  });
+});
+
+describe('reading', () => {
+  const upTo = (unit: number) => words.filter((w) => !w.incidental && w.unit <= unit).map((w) => w.id);
+  const read = (s: LearnerState, id: string, correct = true) =>
+    commit(s, applyPractice(s, { slot: { key: id, itemId: id, practice: 'story', ref: id }, correct, level: 0.4, rtMs: 0, given: '', expected: '' }, start));
+
+  it('counts a word as known only while it is likely remembered, and never counts names', () => {
+    const s = fresh();
+    const meet = stories.find((x) => x.id === 'st:meet')!;
+    expect(storyCoverage(s, meet, start).coverage).toBe(0);
+    commit(s, seedKnown(s, upTo(2), start));
+    expect(storyCoverage(s, meet, start)).toMatchObject({ coverage: 1, unknown: [] }); // 小明, 李华 excluded
+    expect(storyCoverage(s, meet, new Date(+start + 365 * DAY)).coverage).toBeLessThan(0.5); // a year unreviewed
+  });
+
+  it('offers the unread story closest to the target, never one with too many new words', () => {
+    const s = fresh();
+    expect(nextStory(s, start)).toBeUndefined();
+    commit(s, seedKnown(s, upTo(2), start));
+    expect(storyCoverage(s, stories.find((x) => x.id === 'st:hungry')!, start).coverage).toBeLessThan(0.85);
+    const first = nextStory(s, start)!;
+    expect(first.id).toBe('st:meet'); // hello fits as well; the more advanced one wins
+    read(s, first.id);
+    expect(nextStory(s, start)?.id).not.toBe(first.id);
+    expect(s.abilities.get('reading')?.n).toBe(1);
+  });
+
+  it('aims for harder texts after easy reading, easier after struggling', () => {
+    const s = fresh();
+    expect(coverageTarget(s)).toBe(0.92);
+    for (let i = 0; i < 3; i++) read(s, 'st:hello');
+    expect(coverageTarget(s)).toBe(0.88);
+    for (let i = 0; i < 6; i++) read(s, 'st:hello', false);
+    expect(coverageTarget(s)).toBe(0.96);
+  });
+
+  it('a looked-up word counts as a forgotten meaning, at most once per 10 minutes', () => {
+    const s = fresh();
+    commit(s, seedKnown(s, ['w:猫'], start));
+    const before = s.srs.get('w:猫|meaning')!.card.stability;
+    const at = new Date(+start + DAY);
+    const w = applyLookup(s, 'w:猫', at, 'st:family');
+    expect(w.reviews!.map((r) => r.rating)).toEqual([Rating.Again]);
+    expect(w.events!.map((e) => e.type)).toEqual(['answer', 'lookup']);
+    expect(w.mastery![0].lookups).toBe(1);
+    commit(s, w);
+    expect(s.srs.get('w:猫|meaning')!.card.stability).toBeLessThan(before);
+    const again = applyLookup(s, 'w:猫', new Date(+at + 60_000));
+    expect(again.reviews).toBeUndefined();
+    expect(again.events!.map((e) => e.type)).toEqual(['lookup']);
+    expect(applyLookup(s, 'w:狗', at).reviews).toBeUndefined(); // not taught yet: only logged
+  });
+
+  it('"practise this" puts a word first: a new one is introduced, a taught one tested even if not due', () => {
+    const s = fresh();
+    commit(s, seedKnown(s, upTo(1), start));
+    s.profile.focus = ['w:猫', 'w:你好'].map((key) => ({ kind: 'item' as const, key, factor: 1, until: +start + 14 * DAY, since: +start }));
+    expect(newCandidates(s)[0]).toBe('w:猫');
+    const at = new Date(+start + 60_000); // nothing is due a minute after seeding
+    const firstTest = () => buildQueue(s, planSession(planInput(s, 20, at)), at, { audio: true }).find((x) => x.facet && ITEMS.get(x.itemId)!.unit > 0);
+    expect(firstTest()?.itemId).toBe('w:你好');
+    commit(s, applyAnswer(s, { slot: { key: 'k', itemId: 'w:你好' }, facet: 'meaning', format: 'hanzi_to_meaning_mc', result: { verdict: 'correct', notes: [] }, rtMs: 3000, given: 'hello', expected: 'hello' }, at).writes);
+    expect(firstTest()?.itemId).not.toBe('w:你好'); // answered since the request: done
+  });
+
+  it('longer sessions include a story the learner can read', () => {
+    const s = fresh();
+    commit(s, seedKnown(s, upTo(6), start));
+    const at = new Date(+start + 60_000);
+    const input = planInput(s, 45, at);
+    expect(input.inputAvailable).toBe(true);
+    const slot = buildQueue(s, planSession(input), at, { audio: true }).find((x) => x.practice === 'story')!;
+    expect(slot).toBeDefined();
+    expect(makeExercise(s, slot, { now: at, audio: true, mic: false, scaffold: 0 })).toMatchObject({ format: 'story', itemId: slot.ref });
   });
 });

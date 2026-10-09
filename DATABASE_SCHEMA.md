@@ -35,7 +35,8 @@ Dialogue, Story, Roleplay and Mission types land with the slices that use them (
 
 ## Learner tables (Dexie)
 
-Version 3 (slice 6) adds `secrets` (API keys: never exported or logged), `conversations`, `messages`
+Version 4 (slice 7) adds `generated` (AI-written stories with their validation report; never merged
+into the curriculum). Version 3 (slice 6) adds `secrets` (API keys: never exported or logged), `conversations`, `messages`
 and `aiLog` (every AI request and response, without keys). Version 2 (slice 5) adds `pronunciation` (every analysed spoken attempt) and `recordings` (the learner's
 audio, pruned to the newest `privacy.keepRecordings`, default 50). Version 1 creates the tables the learning loop uses: `profile`, `srs`, `mastery`, `events`, `reviews`,
 `errors`, `sessions`, `abilities`, `assessments`. The others below are added (Dexie version bump) by

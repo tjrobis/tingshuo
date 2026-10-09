@@ -72,7 +72,8 @@ src/
   main.tsx, index.css                  entry, Tailwind v4 (light/dark follows the system)
   app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session,
                  Pronunciation (tone-pair grid trainer), Settings (incl. AI provider), Recorder (recording,
-                 contour plot, review), Tutor (AI conversation, review, offline roleplay)
+                 contour plot, review), Tutor (AI conversation, review, offline roleplay), Reader (story list,
+                 story view, tappable text with a word sheet; also used by sessions and the tutor)
                  (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
@@ -92,7 +93,8 @@ src/
                    recording (MediaRecorder → decoded PCM), all on device
     pitch.ts       YIN pitch tracking, per-syllable tone diagnosis + feedback, rhythm, voice-range learning
     ai.ts          provider adapters (Anthropic SDK lazy-loaded, OpenAI/compatible, Gemini) + error mapping
-    tutor.ts       tutor prompts, reply parsing/validation, local pinyin, corrections → errors, request log
+    tutor.ts       AI features: tutor prompts, reply parsing/validation, local pinyin, corrections → errors,
+                   graded AI stories (brief, parse, coverage check, one rewrite), request log
 ```
 
 Grows only when a slice needs it; this block is updated as files land.

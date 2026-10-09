@@ -6,9 +6,10 @@ import { db, persist } from '../lib/db';
 import { PROVIDERS } from '../lib/ai';
 import { applyPractice, isIntroduced, ITEMS, type LearnerState } from '../lib/session';
 import {
-  aiReady, ask, correctionsToErrors, MODES, parseReply, pinyinOf, REPLY_SCHEMA, SCENARIOS, systemPrompt, toMessages, tutorContext, unknownWords,
+  aiReady, ask, correctionsToErrors, MODES, parseReply, pinyinOf, REPLY_SCHEMA, SCENARIOS, systemPrompt, toMessages, tokensOf, tutorContext, unknownWords,
 } from '../lib/tutor';
 import type { CorrectionItem, Dialogue, TutorMode } from '../lib/types';
+import { TapText } from './Reader';
 import { Button, Card, Chip, Label, Screen, Speak } from './ui';
 
 interface Turn {
@@ -202,7 +203,10 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
         {turns.map((t, i) => t.role === 'tutor' ? (
           <div key={i} className="max-w-[85%] self-start rounded-3xl rounded-tl-md bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
             <div className="flex items-start gap-1">
-              <div className="flex-1 text-2xl">{t.text}</div>
+              <div lang="zh" className="flex-1 text-2xl">
+                <TapText tokens={tokensOf(t.text)} state={state} audio={audio} context="tutor" isNew={(x) => !!t.unknown?.includes(x.text)}
+                  glosses={Object.fromEntries((t.newWords ?? []).map((n) => [n.word, n.meaning]))} />
+              </div>
               {audio && <Speak text={t.text} slow />}
             </div>
             {t.pinyin && <div className="text-sm text-slate-500">{t.pinyin}</div>}
@@ -304,13 +308,14 @@ function Roleplay({ state, audio, onBack }: { state: LearnerState; audio: boolea
   }
 
   const zh = surface(current.zh);
+  const tappable = <TapText tokens={splitTokenised(current.zh)} state={state} audio={audio} context={dialogue.id} />;
   return (
     <Screen>
       <Header title={dialogue.title} onBack={() => setDialogue(undefined)} />
       {current.speaker === 'A' ? (
         <Card className="flex flex-col gap-2">
           <Label>They say</Label>
-          <div className="flex items-center gap-2 text-2xl">{zh} {audio && <Speak text={zh} slow />}</div>
+          <div className="flex items-center gap-2 text-2xl"><span lang="zh">{tappable}</span> {audio && <Speak text={zh} slow />}</div>
           <div className="text-slate-500">{pinyinText(current.zh)}</div>
           <div className="text-sm">{current.en}</div>
           <Button onClick={advance}>Your turn</Button>
@@ -326,7 +331,7 @@ function Roleplay({ state, audio, onBack }: { state: LearnerState; audio: boolea
             </form>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-2xl">{zh} {audio && <Speak text={zh} slow />}</div>
+              <div className="flex items-center gap-2 text-2xl"><span lang="zh">{tappable}</span> {audio && <Speak text={zh} slow />}</div>
               <div className="text-slate-500">{pinyinText(current.zh)}</div>
               <p className="text-sm">Did you say something that means the same?</p>
               <div className="grid grid-cols-2 gap-2">

@@ -1,7 +1,7 @@
 // Turns a queue slot into a concrete exercise, picking the format from the current recall
 // probability (planner.chooseFormat), and grades the learner's response with grade.ts.
 
-import { characters, dialogues, grammar, pinyinText, sentences, sentenceWords, soundPairs, surface, targetFor, tonePairWords, toneSets, units, wordById, words } from './curriculum';
+import { characters, dialogues, grammar, pinyinText, sentences, sentenceWords, soundPairs, stories, surface, targetFor, tonePairWords, toneSets, units, wordById, words } from './curriculum';
 import { classifyError, gradeChinese, gradeEnglish, type ChineseTarget, type GradeResult, type Verdict } from './grade';
 import { masteryStatus } from './learner';
 import { formatWord, markSyllable, parseNumbered, surfaceTones, type Syllable } from './pinyin';
@@ -144,6 +144,15 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
       reveal: { zh: '', pinyin: '', en: q.options[q.answer] },
       help: { why: 'Following a real back-and-forth, at speed, is most of what conversation is.', breakdown: words, notes: [] },
     };
+  }
+  if (slot.practice === 'story') {
+    // Rendered by the reader (every word tappable, questions at the end); this only carries the slot.
+    const st = stories.find((x) => x.id === slot.ref);
+    return st ? {
+      slot, itemId: st.id, format: 'story', instruction: `Read: ${st.title}`, showPinyin: false, level: 0.4 * st.unit,
+      reveal: { zh: st.titleZh, pinyin: '', en: st.title },
+      help: { why: 'Stories made almost entirely of words you know turn vocabulary into understanding.', breakdown: [], notes: [] },
+    } : null;
   }
   if (slot.practice === 'shadow') {
     const x = sentences.find((y) => y.id === slot.ref);

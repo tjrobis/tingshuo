@@ -1,7 +1,7 @@
 // Content validation (LEARNING_ENGINE.md §9): curated Mandarin must pass these before it can be taught.
 import { pinyin, polyphonic } from 'pinyin-pro';
 import { describe, expect, it } from 'vitest';
-import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, tonePairWords, toneSets, units, wordById, words } from './curriculum';
+import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, stories, tonePairWords, toneSets, units, wordById, words } from './curriculum';
 import { parseNumbered } from './pinyin';
 import { splitTokenised } from './segment';
 
@@ -157,6 +157,22 @@ describe('dialogues', () => {
       expect(d.lines.every((l) => (l.speaker === 'A' || l.speaker === 'B') && l.en), d.id).toBe(true);
       expect(d.questions.length, d.id).toBeGreaterThan(0);
       for (const q of d.questions) expect(new Set(q.options).size, `${d.id}: ${q.q}`).toBe(3);
+    }
+  });
+});
+
+describe('stories', () => {
+  it('use only lexicon words, are labelled with the unit they need, and have questions', () => {
+    expect(stories.length).toBeGreaterThanOrEqual(10);
+    expect(new Set(stories.map((s) => s.id)).size).toBe(stories.length);
+    for (const st of stories) {
+      const lines = st.paragraphs.flat();
+      const refs = lines.flatMap((l) => l.tokens).filter((t) => t.kind === 'han').map((t) => t.ref!);
+      expect(refs.filter((r) => !wordById.has(`w:${r}`)), st.id).toEqual([]);
+      expect(Math.max(...refs.map((r) => wordById.get(`w:${r}`)!.unit)), `${st.id} unit`).toBe(st.unit);
+      expect(st.paragraphs.every((p) => p.length) && lines.every((l) => l.en), st.id).toBe(true);
+      expect(st.questions.length, st.id).toBeGreaterThanOrEqual(2);
+      for (const q of st.questions) expect(new Set(q.options).size, `${st.id}: ${q.q}`).toBe(3);
     }
   });
 });

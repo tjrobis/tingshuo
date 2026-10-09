@@ -7,7 +7,9 @@ import { adaptScaffold, planSession } from '../lib/planner';
 import { applyAnswer, applyPractice, buildQueue, commit, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
 import { State } from '../lib/srs';
 import { aiReady, ask, explainRequest, tutorContext } from '../lib/tutor';
+import { stories } from '../lib/curriculum';
 import { ExerciseView } from './Exercise';
+import { StoryView, type StoryResult } from './Reader';
 import type { Spoken } from './Recorder';
 import { Bar, Button, Card, Label, Screen } from './ui';
 
@@ -149,6 +151,18 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
       }
       for (const f of unlocked) q = insert(q, i + 4, { key: `${ex.itemId}|${f}|unlocked`, itemId: ex.itemId, facet: f });
     }
+    advance(q, i);
+  }
+
+  /** The reader saved the answers itself; log them for the summary and move on. */
+  function storyDone(results: StoryResult[]) {
+    if (!current) return;
+    const { ex, i } = current;
+    setLog((l) => [...l, ...results.map((r) => ({ ex, result: { verdict: r.correct ? 'correct' : 'wrong', notes: [] } as GradeResult, given: r.given }))]);
+    advance(queue, i);
+  }
+
+  function advance(q: Slot[], i: number) {
     setResult(undefined);
     setGiven('');
     const remaining = minutes * 60_000 - (Date.now() - started.current);
@@ -173,15 +187,17 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
         <div className="flex-1"><Bar value={progress} /></div>
         <span className="text-sm text-slate-500 tabular-nums">{Math.max(0, Math.ceil(minutes - (now - started.current) / 60_000))} min</span>
       </div>
-      <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} stt={state.profile.privacy.stt}
-        explain={aiOn ? () => ask(state.profile, explainRequest(current.ex, tutorContext(state), result ? { given, result } : undefined)) : undefined} />
+      {current.ex.format === 'story'
+        ? <StoryView key={current.ex.slot.key} state={state} story={stories.find((st) => st.id === current.ex.slot.ref)!} audio={audio} sessionId={sessionId.current} onDone={storyDone} />
+        : <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} stt={state.profile.privacy.stt}
+        explain={aiOn ? () => ask(state.profile, explainRequest(current.ex, tutorContext(state), result ? { given, result } : undefined)) : undefined} />}
     </Screen>
   );
 }
 
 function Summary({ log, state, introduced, at, minutes, onExit }: { log: Logged[]; state: LearnerState; introduced: number; at: number; minutes: number; onExit: () => void }) {
   const correct = log.filter((l) => l.result.verdict === 'correct' || l.result.verdict === 'close').length;
-  const mistakes = log.filter((l) => l.result.verdict === 'wrong');
+  const mistakes = log.filter((l) => l.result.verdict === 'wrong' && l.ex.format !== 'story'); // story answers were shown in the reader
   const nextDue = Math.min(...[...state.srs.values()].filter((x) => x.card.state !== State.New && +x.card.due > at).map((x) => +x.card.due));
   const hours = Number.isFinite(nextDue) ? Math.max(1, Math.round((nextDue - at) / 3_600_000)) : undefined;
   return (

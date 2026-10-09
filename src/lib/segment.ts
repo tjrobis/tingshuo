@@ -1,7 +1,7 @@
 // Word segmentation and comprehensibility (known-word coverage).
 // Curated text is pre-tokenised with spaces (`splitTokenised`). Arbitrary text (AI output) uses
 // the platform's ICU segmenter, then splits any ICU word the lexicon doesn't know but whose parts
-// it does (ICU joins 去了; the lexicon has 去 and 了).
+// it does (ICU joins 去了; the lexicon has 去 and 了), and rejoins pieces that form one (李华).
 
 export type TokenKind = 'han' | 'punct' | 'latin' | 'number' | 'space';
 
@@ -50,6 +50,18 @@ export function segment(text: string, has: (word: string) => boolean): Token[] {
     }
     if (pieces.every(has)) tokens.push(...pieces.map((w) => ({ text: w, kind, ref: w })));
     else tokens.push({ text: word, kind });
+  }
+  // The reverse: ICU doesn't know every lexicon word (the name 李华 comes out as 李 + 华), so unknown
+  // pieces that together make one are rejoined. Runs of known words are left alone.
+  for (let i = 0; i < tokens.length; i++) {
+    for (let j = Math.min(tokens.length, i + 4); j > i + 1; j--) {
+      const run = tokens.slice(i, j);
+      const text = run.map((t) => t.text).join('');
+      if (run.every((t) => t.kind === 'han') && run.some((t) => !t.ref) && has(text)) {
+        tokens.splice(i, j - i, { text, kind: 'han', ref: text });
+        break;
+      }
+    }
   }
   return tokens;
 }

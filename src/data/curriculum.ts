@@ -751,3 +751,172 @@ B|不客气 。|You're welcome.
 ?|Where is the restroom?|On the left|On the right|Upstairs
 ?|Is it far?|No, it's close|Yes, quite far|They don't say
 `;
+
+// Graded stories, built only from lexicon words; unit = the latest unit any of their words is from.
+// `@ id|unit|title|Chinese title|topics`, then `zh|en` sentences; `¶` starts a paragraph;
+// `?|question|right answer|wrong|wrong`.
+export const STORIES = `
+@ hello|1|Hello!|你好 ！|people
+你好 ！ 我 是 学生 。|Hello! I'm a student.
+他 也 是 学生 ， 她 是 老师 。|He's a student too, and she's a teacher.
+我们 很 好 ， 老师 也 很 好 。|We're fine, and so is the teacher.
+你 呢 ？ 你 是 学生 吗 ？|And you? Are you a student?
+?|Who is the teacher?|She is|He is|The narrator
+?|Is he a student?|Yes|No|They don't say
+
+@ meet|2|Nice to meet you|认识 你 很 高兴|people
+我 叫 小明 。|My name is Xiaoming.
+我 是 中国 人 ， 我 是 学生 。|I'm Chinese, and I'm a student.
+我 会 说 中文 ， 也 会 说 一点 英文 。|I speak Chinese, and a little English too.
+¶
+李华 是 我 朋友 。|Li Hua is my friend.
+她 也 是 中国 人 。|She's Chinese too.
+她 不 是 学生 ， 她 是 老师 。|She isn't a student; she's a teacher.
+她 会 说 英文 。|She speaks English.
+¶
+你 呢 ？ 你 叫 什么 名字 ？ 你 是 哪 国 人 ？|And you? What's your name? Where are you from?
+?|What does Li Hua do?|She's a teacher|She's a student|They don't say
+?|Which languages does Xiaoming speak?|Chinese and a little English|Only Chinese|English and a little Chinese
+
+@ again|3|Say it again, please|请 再 说 一 遍|people
+小明 是 我 朋友 ， 他 是 中国 人 。|Xiaoming is my friend. He's Chinese.
+他 说 中文 ， 我 听 不 懂 。|He speaks Chinese, and I don't understand.
+我 说 ： 对不起 ， 请 说 慢 一点 。|I say: Sorry, please speak a little more slowly.
+他 说 ： 好 ， 没关系 。|He says: OK, no problem.
+¶
+我 问 他 ： 认识 是 什么 意思 ？|I ask him: What does 认识 mean?
+他 说 ： 请 等 一下 。|He says: Just a moment.
+他 用 英文 说 。 我 说 ： 谢谢 你 ！|He says it in English. I say: Thank you!
+他 说 ： 不客气 。 你 可以 再 问 我 。|He says: You're welcome. Ask me again any time.
+?|Why does the narrator say sorry?|They don't understand Xiaoming|They are late|They forgot his name
+?|How does Xiaoming explain 认识?|He says it in English|He writes it down|He says it more slowly
+
+@ hobbies|5|What are your hobbies?|你 有 什么 爱好 ？|hobbies,gaming,outdoors
+我 叫 小明 ， 今年 二 十 岁 。|I'm Xiaoming, and I'm twenty this year.
+我 有 很 多 爱好 。|I have lots of hobbies.
+我 喜欢 玩 游戏 ， 也 喜欢 看 电影 。|I like playing games, and I like watching movies too.
+我 不 太 喜欢 运动 。|I don't really like sports.
+¶
+我 朋友 李华 非常 喜欢 运动 。|My friend Li Hua loves sports.
+她 喜欢 跑步 ， 也 喜欢 爬山 。|She likes running, and hiking too.
+她 不 玩 游戏 。|She doesn't play games.
+¶
+我们 都 喜欢 音乐 ， 也 都 爱 唱歌 ！|We both like music, and we both love singing!
+?|How old is Xiaoming?|20|12|They don't say
+?|What does Li Hua like?|Running and hiking|Games and movies|Only singing
+?|What do they both like?|Music and singing|Sports|Movies
+
+@ family|6|My family|我 家|family
+我 家 有 五 口 人 ： 爸爸 、 妈妈 、 姐姐 、 弟弟 和 我 。|There are five people in my family: Dad, Mom, my older sister, my younger brother and me.
+我 爸爸 是 老师 ， 我 妈妈 也 是 老师 。|My dad is a teacher, and my mom is a teacher too.
+我 姐姐 二 十 五 岁 ， 她 有 男朋友 。|My sister is twenty-five, and she has a boyfriend.
+我 弟弟 十 岁 ， 他 是 学生 。|My little brother is ten; he's a student.
+¶
+我们 家 有 一 只 狗 和 两 只 猫 。|We have a dog and two cats.
+狗 很 大 ， 猫 都 很 小 。|The dog is big; the cats are both small.
+我 弟弟 非常 喜欢 狗 。|My little brother loves the dog.
+我 喜欢 猫 。|I like the cats.
+?|How many people are in the family?|Five|Four|Six
+?|What does the mother do?|She's a teacher|She's a student|They don't say
+?|What pets do they have?|A dog and two cats|Two dogs and a cat|Only a cat
+
+@ hungry|7|We're hungry!|我们 饿 了 ！|food
+我 和 李华 都 饿 了 ， 我们 想 吃 面 。|Li Hua and I are both hungry, and we want noodles.
+服务员 问 ： 你们 要 什么 ？|The waiter asks: What would you like?
+我 说 ： 我 要 一 碗 面 ， 不 要 太 辣 。|I say: A bowl of noodles for me, not too spicy.
+李华 说 ： 我 喜欢 辣 的 ！ 我 要 一 碗 辣 的 。|Li Hua says: I like it spicy! A spicy bowl for me.
+我们 也 要 两 杯 茶 。|We'd also like two cups of tea.
+¶
+面 非常 好吃 。|The noodles are delicious.
+李华 说 ： 太 辣 了 ！ 服务员 ， 我 要 一 杯 水 ！|Li Hua says: Too spicy! Waiter, a glass of water please!
+吃 了 饭 ， 我 说 ： 服务员 ， 买单 ！|After the meal, I say: Waiter, the check please!
+?|What do they order?|Noodles|Dumplings|Rice
+?|What happens to Li Hua?|Her noodles are too spicy|She doesn't like tea|She isn't hungry
+?|Who wanted the noodles not too spicy?|The narrator|Li Hua|The waiter
+
+@ clothes|8|Buying clothes|买 衣服|shopping
+我 想 买 衣服 。 这个 商店 卖 很 多 衣服 。|I want to buy some clothes. This shop sells lots of clothes.
+我 很 喜欢 这 件 。|I really like this one.
+我 问 ： 这 件 衣服 多少 钱 ？|I ask: How much is this one?
+卖 衣服 的 人 说 ： 九 十 块 。|The seller says: Ninety yuan.
+我 说 ： 太 贵 了 ！ 便宜 一点 吧 。|I say: That's too expensive! Make it a bit cheaper.
+她 说 ： 八 十 块 ， 可以 吗 ？|She says: Eighty, OK?
+我 说 ： 六 十 块 吧 。|I say: How about sixty?
+她 说 ： 好 吧 ， 七 十 块 。|She says: Fine, seventy.
+¶
+我 问 ： 我 能 用 手机 买 吗 ？|I ask: Can I pay with my phone?
+她 说 ： 可以 。|She says: Sure.
+七 十 块 ， 不 贵 ！ 我 很 高兴 。|Seventy yuan, not expensive! I'm happy.
+?|What price did the seller ask first?|90 yuan|80 yuan|70 yuan
+?|What price did they agree on?|70 yuan|60 yuan|80 yuan
+?|How does the narrator pay?|With their phone|In cash|They don't buy it
+
+@ busy|9|Xiaoming is busy|小明 很 忙|school,hobbies
+小明 是 学生 ， 他 每 天 都 很 忙 。|Xiaoming is a student, and he's busy every day.
+他 每 天 早上 六 点 半 跑步 ， 晚上 看 书 。|He runs at half past six every morning and reads in the evening.
+星期 六 和 星期 天 是 周末 。|Saturday and Sunday are the weekend.
+周末 他 不 忙 ， 他 和 朋友 玩 游戏 、 看 电影 。|At the weekend he isn't busy: he plays games and watches movies with friends.
+¶
+今天 星期 五 。 李华 问 他 ： 你 明天 有 时间 吗 ？|Today is Friday. Li Hua asks him: Are you free tomorrow?
+小明 说 ： 有 ！ 明天 早上 十 点 ， 可以 吗 ？|Xiaoming says: Yes! Tomorrow at ten in the morning, OK?
+李华 说 ： 太 好 了 ！|Li Hua says: Great!
+?|When does Xiaoming go running?|6:30 every morning|Every evening|At the weekend
+?|What day is it today?|Friday|Saturday|Sunday
+?|When will they meet?|Tomorrow at 10 a.m.|Tonight at 10|On Sunday
+
+@ shanghai|10|I live in Shanghai|我 住 在 上海|people,school
+我 叫 李华 ， 我 是 北京 人 ， 现在 住 在 上海 。|I'm Li Hua. I'm from Beijing, but now I live in Shanghai.
+我 在 大学 工作 ， 我 是 老师 。|I work at a university; I'm a teacher.
+我 的 学生 都 很 好 。|My students are all great.
+¶
+我 的 朋友 小明 在 公司 工作 ， 他 每 天 都 很 忙 。|My friend Xiaoming works at a company, and he's busy every day.
+星期 五 晚上 我 去 他 家 ， 我们 吃 饺子 。|On Friday evening I go to his place, and we eat dumplings.
+¶
+我 爸爸 妈妈 都 在 北京 。|My mom and dad are both in Beijing.
+周末 我 想 回 北京 。|At the weekend I'd like to go back to Beijing.
+?|Where is Li Hua from?|Beijing|Shanghai|They don't say
+?|Where does Xiaoming work?|At a company|At a university|At a school
+?|What would Li Hua like to do at the weekend?|Go back to Beijing|Eat dumplings|Work
+
+@ plans|11|Weekend plans|周末 你 打算 做 什么 ？|people,outdoors
+今天 星期 五 。 小明 问 李华 ： 周末 你 打算 做 什么 ？|It's Friday. Xiaoming asks Li Hua: What are you planning to do this weekend?
+李华 说 ： 我 还 不 知道 。 你 呢 ？|Li Hua says: I don't know yet. And you?
+小明 说 ： 我 想 去 爬山 。 我们 一起 去 吧 ！|Xiaoming says: I want to go hiking. Let's go together!
+李华 说 ： 我 不 太 喜欢 爬山 。 我们 去 看 电影 ， 怎么样 ？|Li Hua says: I don't really like hiking. How about we go see a movie?
+小明 说 ： 好 ！ 星期 六 晚上 七 点 ， 可以 吗 ？|Xiaoming says: OK! Saturday at seven in the evening, all right?
+李华 说 ： 可以 ， 星期 六 见 ！|Li Hua says: Sure, see you Saturday!
+¶
+星期 天 李华 问 小明 ： 你 觉得 电影 怎么样 ？|On Sunday Li Hua asks Xiaoming: What did you think of the movie?
+小明 说 ： 我 觉得 非常 好 ， 我 还 想 再 看 一 遍 ！|Xiaoming says: I thought it was great. I want to see it again!
+?|What did Xiaoming want to do at first?|Go hiking|See a movie|Stay home
+?|When do they meet?|Saturday at 7 p.m.|Friday at 7 p.m.|Sunday morning
+?|What did Xiaoming think of the movie?|He loved it|It was boring|He didn't go
+
+@ yesterday|11|Yesterday|昨天|food,people
+昨天 我 早上 七 点 起床 。|Yesterday I got up at seven in the morning.
+我 喝 了 一 杯 咖啡 ， 没 吃 饭 。|I had a cup of coffee but didn't eat anything.
+我 去 公司 工作 ， 工作 非常 忙 。|I went to the office, and work was really busy.
+¶
+晚上 我 很 饿 ， 我 做 了 饺子 。|In the evening I was very hungry, so I made dumplings.
+我 吃 了 二 十 个 饺子 ！|I ate twenty dumplings!
+我 晚上 十 一 点 睡觉 。|I went to bed at eleven.
+¶
+今天 星期 六 。 现在 已经 十 点 了 ， 我 还 没 起床 ！|Today is Saturday. It's already ten, and I'm still not up!
+?|What did the narrator have in the morning?|A coffee|Dumplings|Tea and rice
+?|How many dumplings did they eat?|20|10|12
+?|What is the narrator doing at ten on Saturday?|Still in bed|Working|Making dumplings
+
+@ hotel|12|To the hotel|去 酒店|travel
+我 和 朋友 去 北京 旅行 。|My friend and I are traveling to Beijing.
+我们 从 上海 坐 飞机 到 北京 。|We fly from Shanghai to Beijing.
+到 了 机场 ， 我 问 一 个 人 ： 酒店 远 吗 ？|At the airport, I ask someone: Is the hotel far?
+他 说 ： 很 远 。 你们 可以 坐 地铁 ， 也 可以 坐 出租车 。|He says: Very far. You can take the subway or a taxi.
+出租车 很 贵 ， 地铁 很 便宜 。 我们 坐 地铁 吧 ！|Taxis are expensive and the subway is cheap. Let's take the subway!
+¶
+我们 到 了 。 酒店 在 哪儿 ？|We've arrived. Where's the hotel?
+一 个 人 说 ： 往 左 走 ， 酒店 在 左边 ， 很 近 。|Someone says: Go left; the hotel's on the left, very close.
+太 好 了 ！|Great!
+?|How do they travel from Shanghai to Beijing?|By plane|By train|By taxi
+?|Why do they take the subway?|It's cheaper|It's faster|There are no taxis
+?|Where is the hotel?|On the left, close by|On the right|Next to the airport
+`;

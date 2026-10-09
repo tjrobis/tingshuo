@@ -5,20 +5,20 @@ import { db } from '../lib/db';
 import { errorPatterns } from '../lib/grade';
 import { abilityBand, expectedKnown, masteryStatus, streak, trueRetention, weeklyVelocity } from '../lib/learner';
 import { planSession } from '../lib/planner';
-import { facetsOf, isIntroduced, ITEMS, planInput, type LearnerState } from '../lib/session';
+import { facetsOf, isIntroduced, ITEMS, nextStory, planInput, storyCoverage, type LearnerState } from '../lib/session';
 import { micSupported, primeAudio } from '../lib/audio';
 import { SKILLS, type MasteryStatus } from '../lib/types';
 import { Bar, Button, Card, Label, Screen } from './ui';
 
 const SKILL_NAMES: Record<string, string> = {
-  vocab: 'Vocabulary', listening: 'Listening', reading: 'Reading pinyin', speaking: 'Speaking', tones: 'Hearing tones',
+  vocab: 'Vocabulary', listening: 'Listening', reading: 'Reading', speaking: 'Speaking', tones: 'Hearing tones',
   pronunciation: 'Pronunciation', grammar: 'Grammar', characters: 'Characters',
 };
 /** Rounded on purpose: these are estimates, not counts. */
 const approx = (n: number) => (n < 20 ? Math.round(n) : Math.round(n / 5) * 5);
 
 export function Home({ state, audio, onLearn, onOpen }: {
-  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings' | 'tutor') => void;
+  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings' | 'tutor' | 'reader', story?: string) => void;
 }) {
   const [minutes, setMinutes] = useState(state.profile.sessionMinutes);
   const [why, setWhy] = useState(false);
@@ -53,6 +53,7 @@ export function Home({ state, audio, onLearn, onOpen }: {
   });
   const solid = skills.filter((x) => !x.band.tentative).sort((a, b) => b.a.theta - a.a.theta);
   const recurring = errorPatterns(state.errors, [], +now).filter((p) => p.status === 'recurring');
+  const story = nextStory(state, now);
 
   function setLength(m: number) {
     setMinutes(m);
@@ -68,8 +69,6 @@ export function Home({ state, audio, onLearn, onOpen }: {
         </div>
         <div className="flex items-center gap-1">
           {days > 0 && <div className="mr-2 text-right text-sm text-slate-500"><span className="text-xl font-semibold text-slate-900 dark:text-slate-100">{days}</span> day streak</div>}
-          <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('tutor')}>Talk</Button>
-          <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('pronunciation')}>Pronunciation</Button>
           <Button variant="ghost" className="px-3 py-2 text-sm" onClick={() => onOpen('settings')} aria-label="Settings">⚙</Button>
         </div>
       </header>
@@ -98,6 +97,23 @@ export function Home({ state, audio, onLearn, onOpen }: {
           </ul>
         )}
       </Card>
+
+      <div className="grid grid-cols-3 gap-2">
+        <Button variant="secondary" onClick={() => onOpen('tutor')}>Talk</Button>
+        <Button variant="secondary" onClick={() => onOpen('reader')}>Read</Button>
+        <Button variant="secondary" onClick={() => onOpen('pronunciation')}>Tones</Button>
+      </div>
+
+      {story && (
+        <Card className="flex items-center gap-3">
+          <div className="flex-1">
+            <Label>A story you can read</Label>
+            <div className="text-xl" lang="zh">{story.titleZh}</div>
+            <div className="text-sm text-slate-500">{story.title} · you know {Math.round(storyCoverage(state, story, now).coverage * 100)}% of the words</div>
+          </div>
+          <Button variant="secondary" onClick={() => onOpen('reader', story.id)}>Read</Button>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 gap-3">
         <Card className="flex flex-col gap-2">

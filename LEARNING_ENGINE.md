@@ -71,8 +71,8 @@ Facet meanings:
 
 Other signals:
 
-- **Lookup during reading** of an item whose `meaning` facet is active → Again on `meaning`
-  (unless reviewed in the last 10 minutes — avoids double penalty).
+- **Lookup during reading** of an item whose `meaning` facet has been reviewed → Again on `meaning`
+  (unless reviewed in the last 10 minutes — avoids double penalty). The sheet says so.
 - **Secondary evidence** *(planned, not yet implemented)*: an exercise has one primary facet. If it also exercises another facet
   that is currently due (R < target), that facet receives the same rating (implicit review);
   otherwise only an exposure is logged.
@@ -271,12 +271,23 @@ AI-generated content:
 
 ## 10. Comprehensible input targeting
 
-- Coverage = known tokens / content tokens (punctuation and declared names excluded); a token is
-  "known" if its item status ≥ learning and `meaning` or `listening` R ≥ 0.5.
-- Target coverage band 0.90–0.95 (configurable 0.85–0.98). The engine raises the target when
-  story comprehension is ≥ 90 % and lowers it when < 60 %.
-- Curated stories are offered in order of best fit; AI stories are generated from: known words
-  (≤ 400 most stable), 3–6 "developing" target words, interest topic, and target length.
+- Coverage = known tokens / content tokens (punctuation, numbers in digits and names excluded); a
+  word is "known" while its `meaning` or `listening` R ≥ 0.5 (taught, and still more likely
+  remembered than not), so coverage falls as words are forgotten.
+- Target coverage 92 %. Over the last six story questions, ≥ 90 % right lowers it to 88 % (harder
+  texts), < 60 % raises it to 96 % (easier). A story is offered only within 7 points of the target.
+- Curated stories: the unread one closest to the target (ties: the most advanced) appears on Home and,
+  in sessions with ≥ 1¼ minutes of input time, as a story slot. Comprehension answers are practice
+  (reading ability), not reviews.
+- AI stories are briefed with known words (≤ 400 most stable), the 6 least stable known words, the
+  topic and a length by level (6/9/12 sentences); at most (1 − target) × ~6 words per sentence may be
+  new. Every word is checked on
+  the device; a story more than 5 points under the target gets one rewrite request naming the unknown
+  words, and is then shown with its report either way. Pinyin is computed locally; glosses for words
+  outside the course are labelled unverified and can't be practised.
+- Every word is tappable (reader, tutor replies, roleplay). A tap is a lookup (§3). "Practise this"
+  puts the word first in the next session: introduced if new, tested if taught (even when not due),
+  until it has been answered once.
 
 ## 11. Meta-learning
 

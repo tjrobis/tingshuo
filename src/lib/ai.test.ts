@@ -3,7 +3,8 @@ import { anthropicChat, chat, geminiChat, openaiChat, type ChatRequest } from '.
 import { db } from './db';
 import { charOverlap } from './grade';
 import { commit, emptyState, newProfile, seedKnown } from './session';
-import { ask, correctionsToErrors, MODES, parseReply, REPLY_SCHEMA, systemPrompt, unknownWords } from './tutor';
+import { words } from './curriculum';
+import { ask, correctionsToErrors, generateStory, MODES, parseReply, parseStory, REPLY_SCHEMA, storyBrief, storyRequest, systemPrompt, unknownWords } from './tutor';
 
 // ── A stand-in for the Anthropic SDK that records what it was asked ──
 const sdk = vi.hoisted(() => {
@@ -177,5 +178,63 @@ describe('pinyin for AI text', () => {
     const { pinyinOf } = await import('./tutor');
     expect(await pinyinOf('你好！你是学生吗？')).toBe('nǐhǎo! nǐ shì xuésheng ma?');
     expect(await pinyinOf('我喜欢熊猫。')).toMatch(/^wǒ xǐhuan xióngmāo\.$/); // 熊猫 isn't in the lexicon
+  });
+});
+
+describe('AI stories', () => {
+  const learner = () => {
+    const s = emptyState(newProfile({ name: 'Sam', goals: [], interests: [], sessionMinutes: 20, pinyinMode: 'new' }, new Date()));
+    commit(s, seedKnown(s, words.filter((w) => !w.incidental && w.unit <= 2).map((w) => w.id), new Date()));
+    s.profile.ai = { provider: 'openai-compatible', model: 'qwen2.5', baseUrl: 'http://localhost:11434/v1', consent: true };
+    return s;
+  };
+  const questions = [{ q: 'Who?', options: ['A', 'B', 'C'], answer: 0 }, { q: 'Where?', options: ['A', 'B', 'C'], answer: 2 }];
+
+  it('briefs the model with known words, words to practise, the topic and the coverage target', () => {
+    const b = storyBrief(learner(), 'school');
+    expect(b.known).toContain('学生');
+    expect(b.known).not.toContain('喜欢'); // unit 5, not learned
+    expect(b).toMatchObject({ topic: 'school', sentences: 6, target: 0.92 });
+    expect(b.practise.length).toBe(6);
+    expect(storyRequest(b).system).toMatch(/Topic: school/);
+  });
+
+  it('parses stories defensively, dropping broken questions and non-Chinese lines', () => {
+    const text = '```json\n' + JSON.stringify({
+      title: 'Cats', titleZh: '猫', paragraphs: [[{ zh: '我有猫。', en: 'I have a cat.' }, { zh: 'hello', en: 'x' }], []],
+      questions: [questions[0], { q: 'Bad', options: ['A'], answer: 0 }, { q: 'Out of range', options: ['A', 'B'], answer: 5 }],
+      newWords: [{ word: '猫', meaning: 'cat' }],
+    }) + '\n```';
+    const p = parseStory(text)!;
+    expect(p.paragraphs).toEqual([[{ zh: '我有猫。', en: 'I have a cat.' }]]);
+    expect(p.questions).toEqual([questions[0]]);
+    expect(parseStory('Sorry, no story.')).toBeNull();
+    expect(parseStory('{"paragraphs": [[{"zh": "hello"}]]}')).toBeNull();
+  });
+
+  it('checks every word on the device, asks for one rewrite naming the unknown ones, and stores the report', async () => {
+    const s = learner();
+    const story = (zh: string) => JSON.stringify({ title: 'T', titleZh: '学生', paragraphs: [[{ zh, en: 'e' }]], questions, newWords: [{ word: '熊猫', meaning: 'panda' }] });
+    const replies = [story('我喜欢熊猫，熊猫喜欢竹子。'), story('我是学生，她是老师。我叫小明。')];
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ choices: [{ message: { content: replies.shift() } }] })));
+    vi.stubGlobal('fetch', fetchMock);
+    const st = await generateStory(s, 'school');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const retry = JSON.parse(fetchMock.mock.calls[1][1].body as string) as { messages: { content: string }[] };
+    expect(retry.messages.at(-1)!.content).toMatch(/喜欢.*熊猫|熊猫.*喜欢/);
+    expect(st.ai!.validation).toMatchObject({ passed: true, coverage: 1, attempts: 2, unknown: [] });
+    expect(st.paragraphs[0][0].tokens.filter((t) => t.kind === 'han').map((t) => t.text)).toEqual(['我', '是', '学生', '她', '是', '老师', '我', '叫', '小明']);
+    expect(st.id).toMatch(/^ai:\d+$/);
+    const saved = await db.generated.get(Number(st.id.slice(3)));
+    expect(saved).toMatchObject({ kind: 'story', topic: 'school', provider: 'openai-compatible', validation: { passed: true, attempts: 2 } });
+  });
+
+  it('keeps a story that still misses the target, with the problem stated', async () => {
+    const s = learner();
+    const reply = JSON.stringify({ title: 'T', titleZh: 'T', paragraphs: [[{ zh: '我喜欢熊猫。', en: 'I like pandas.' }]], questions, newWords: [] });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ choices: [{ message: { content: reply } }] }))));
+    const st = await generateStory(s, 'food');
+    expect(st.ai!.validation.passed).toBe(false);
+    expect(st.ai!.validation.issues[0]).toMatch(/33% of the words are ones you know/);
   });
 });

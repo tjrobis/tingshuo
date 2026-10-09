@@ -7,11 +7,12 @@ import { Home } from './Home';
 import { Onboarding } from './Onboarding';
 import { Placement } from './Placement';
 import { Pronunciation } from './Pronunciation';
+import { Reader } from './Reader';
 import { Session } from './Session';
 import { Settings } from './Settings';
 import { Tutor } from './Tutor';
 
-type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' } | { name: 'tutor' };
+type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' } | { name: 'tutor' } | { name: 'reader'; story?: string };
 
 export default function App() {
   const [state, setState] = useState<LearnerState | null>();
@@ -45,6 +46,8 @@ export default function App() {
       return <Session state={state} minutes={view.minutes} audio={audio} onExit={home} />;
     case 'pronunciation':
       return <Pronunciation state={state} audio={audio} onProfile={updateProfile} onBack={home} />;
+    case 'reader':
+      return <Reader state={state} audio={audio} open={view.story} onBack={home} />;
     case 'tutor':
       return <Tutor state={state} audio={audio} onBack={home} />;
     case 'settings':
@@ -55,7 +58,7 @@ export default function App() {
           state={state}
           audio={audio}
           onLearn={(minutes) => setView({ name: 'session', minutes })}
-          onOpen={(name) => setView({ name } as View)}
+          onOpen={(name, story) => setView({ name, story } as View)}
         />
       );
   }

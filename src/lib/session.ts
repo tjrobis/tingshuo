@@ -1,15 +1,15 @@
 // The learning loop: item registry, learner state, building a session queue, and applying answers.
 // Pure functions over an in-memory LearnerState; db.ts persists the Writes they return.
 
-import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, words } from './curriculum';
+import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, stories, wordById, words } from './curriculum';
 import type { Writes } from './db';
 import { errorPatterns, patternKey, type GradeResult } from './grade';
-import { splitTokenised } from './segment';
+import { computeCoverage, splitTokenised, type Coverage } from './segment';
 import { expectedKnown, facetsToActivate, median, newMastery, recordAnswer, updateAbility } from './learner';
 import { FORMATS, type PlanInput, type SessionPlan } from './planner';
 import { createEmptyCard, rate, Rating, retrievability, review, State } from './srs';
 import type {
-  ErrorRecord, Facet, ItemKind, LearningEvent, LessonRecord, MasteryState, ReviewRecord, Skill, SkillAbility, SRSState, UserProfile,
+  ErrorRecord, Facet, ItemKind, LearningEvent, LessonRecord, MasteryState, ReviewRecord, Skill, SkillAbility, SRSState, Story, UserProfile,
 } from './types';
 
 const DAY = 86_400_000;
@@ -109,6 +109,8 @@ export function newCandidates(s: LearnerState): string[] {
   const grammarReady = grammar.filter((g) => !isIntroduced(s, g.id) && sentences.some((x) => x.grammar.includes(g.id) && ready(sentenceWords(x))));
   const charsReady = characters.filter((c) =>
     !isIntroduced(s, c.id) && words.some((w) => w.hanzi.includes(c.char) && (s.srs.get(`${w.id}|meaning`)?.card.stability ?? 0) >= 3));
+  // "Practise this" from the reader jumps the queue, even ahead of the current unit.
+  const asked = s.profile.focus.filter((f) => f.kind === 'item' && ITEMS.has(f.key) && !isIntroduced(s, f.key)).map((f) => f.key);
   const open = words.filter((w) => !w.incidental && !isIntroduced(s, w.id));
   const unit = open[0]?.unit ?? 0;
   // Within the current unit, teach next whichever word makes the most sentences readable ("every new
@@ -127,12 +129,60 @@ export function newCandidates(s: LearnerState): string[] {
     known.add(best.id);
     pool.splice(pool.indexOf(best), 1);
   }
-  return [
+  return [...new Set([
+    ...asked,
     ...grammarReady.slice(0, 1).map((g) => g.id),
     ...charsReady.slice(0, 2).map((c) => c.id),
     ...next.map((w) => w.id),
     ...open.filter((w) => w.unit > unit).map((w) => w.id),
-  ];
+  ])];
+}
+
+// ───────────── Reading (LEARNING_ENGINE §10) ─────────────
+/** Known for reading: taught, and its meaning or sound is still more likely remembered than not. */
+export function knowsWord(s: LearnerState, id: string, now: Date): boolean {
+  const R = (f: Facet) => {
+    const x = s.srs.get(`${id}|${f}`);
+    return x ? retrievability(x.card, now) : 0;
+  };
+  return Math.max(R('meaning'), R('listening')) >= 0.5;
+}
+
+/** Share of a story's words the learner knows; names don't count either way. */
+export function storyCoverage(s: LearnerState, st: Story, now: Date): Coverage {
+  const tokens = st.paragraphs.flat().flatMap((l) => l.tokens).filter((t) => !wordById.get(`w:${t.ref}`)?.incidental);
+  return computeCoverage(tokens, (t) => !!t.ref && knowsWord(s, `w:${t.ref}`, now));
+}
+
+/** Target known-word share: 92 %, harder (88 %) while comprehension stays ≥ 90 %, easier (96 %) below 60 %. */
+export function coverageTarget(s: LearnerState): number {
+  const recent = s.answers.filter((e) => e.meta?.practice === 'story').slice(-6);
+  if (recent.length < 3) return 0.92;
+  const rate = recent.filter((e) => e.correct).length / recent.length;
+  return rate >= 0.9 ? 0.88 : rate < 0.6 ? 0.96 : 0.92;
+}
+
+/** The unread curated story whose coverage is closest to the target (ties: the most advanced), if any is readable enough. */
+export function nextStory(s: LearnerState, now: Date): Story | undefined {
+  const read = new Set(s.answers.filter((e) => e.meta?.practice === 'story').map((e) => e.meta!.ref));
+  const target = coverageTarget(s);
+  return stories
+    .filter((st) => !read.has(st.id))
+    .map((st) => ({ st, c: storyCoverage(s, st, now).coverage }))
+    .filter((x) => x.c >= target - 0.07)
+    .sort((a, b) => Math.abs(a.c - target) - Math.abs(b.c - target) || b.st.unit - a.st.unit)[0]?.st;
+}
+
+/** A word tapped while reading: logged, and a taught word's meaning counts as forgotten unless reviewed in the last 10 minutes (§3). */
+export function applyLookup(s: LearnerState, itemId: string, now: Date, context?: string): Writes {
+  const event: LearningEvent = { at: +now, type: 'lookup', itemId, meta: context ? { context } : undefined };
+  const meaning = s.srs.get(`${itemId}|meaning`);
+  const m = s.mastery.get(itemId);
+  if (!meaning || meaning.card.state === State.New || s.reviews.some((r) => r.srsId === meaning.id && r.at > +now - 10 * 60_000)) {
+    return { events: [event], mastery: m ? [{ ...m, lookups: m.lookups + 1 }] : [] };
+  }
+  const { writes } = applyAnswer(s, { slot: { key: 'lookup', itemId }, facet: 'meaning', format: 'lookup', result: { verdict: 'wrong', notes: [] }, rtMs: 0, given: '', expected: '', context }, now);
+  return { ...writes, mastery: writes.mastery!.map((x) => ({ ...x, lookups: x.lookups + 1 })), events: [...writes.events!, event] };
 }
 
 // ───────────── Planning input ─────────────
@@ -154,7 +204,7 @@ export function planInput(s: LearnerState, minutes: number, now: Date, audio = t
     audio,
     micAvailable: !!s.profile.micAvailable,
     knownWords: expectedKnown([...s.srs.values()], 'meaning', now),
-    inputAvailable: false, // slice 7
+    inputAvailable: !!nextStory(s, now),
     recurringPatterns: recurring.length,
     toneConfusion: recurring.some((p) => p.key.startsWith('tone:')),
     focus: s.profile.focus,
@@ -176,15 +226,15 @@ export interface Slot {
   intro?: boolean;
   /** Error-pattern key when this slot is a targeted drill. */
   drill?: string;
-  /** Practice that isn't a spaced-repetition review: shadowing a sentence, or a listening dialogue. */
-  practice?: 'shadow' | 'dialogue';
-  /** Sentence or dialogue id for practice slots. */
+  /** Practice that isn't a spaced-repetition review: shadowing a sentence, a listening dialogue, a story. */
+  practice?: 'shadow' | 'dialogue' | 'story';
+  /** Sentence, dialogue or story id for practice slots. */
   ref?: string;
 }
 
 /**
  * Turn a plan into an ordered queue: pronunciation warm-up → reviews interleaved with new items
- * (each new item re-tested after a gap) → listening (a dialogue, then words) → speaking (tone production,
+ * (each new item re-tested after a gap) → a story → listening (a dialogue, then words) → speaking (tone production,
  * shadowing) → error drills → closing retrieval of today's items.
  * Exercise formats are chosen later, when each slot is shown, from the then-current recall probability.
  */
@@ -208,8 +258,13 @@ export function buildQueue(s: LearnerState, plan: SessionPlan, now: Date, opts: 
     warm.push(...take(all.filter((x) => isPronunciation(x.itemId) && x.facet === 'perceive' && x.card.state !== State.New).sort((a, b) => R(a) - R(b)).slice(0, Math.max(0, cap - warm.length))));
   }
 
-  // Reviews, most at-risk first, with new items woven in; each new item's first test waits ≥ 2 slots.
-  const reviews = take(due.filter((x) => !isPronunciation(x.itemId)).slice(0, plan.reviews));
+  // Reviews: first anything the learner asked to practise (and hasn't answered since), then most
+  // at-risk first, with new items woven in; each new item's first test waits ≥ 2 slots.
+  const asked = s.profile.focus.filter((f) => f.kind === 'item' && f.until > +now && !s.answers.some((e) => e.itemId === f.key && e.at > (f.since ?? 0)));
+  const reviews = [
+    ...take(asked.flatMap((f) => all.filter((x) => x.itemId === f.key).sort((a, b) => R(a) - R(b)).slice(0, 1))),
+    ...take(due.filter((x) => !isPronunciation(x.itemId)).slice(0, plan.reviews)),
+  ];
   const fresh = newCandidates(s).slice(0, plan.newItems);
   const main: Slot[] = [];
   let waiting: Slot[] = [];
@@ -218,6 +273,10 @@ export function buildQueue(s: LearnerState, plan: SessionPlan, now: Date, opts: 
     waiting = [slot(id, PRIMARY[ITEMS.get(id)!.kind])];
   }
   main.push(...reviews, ...waiting);
+
+  // Reading: one story at the learner's level, when the plan has a couple of minutes for it.
+  const story = capacity('input', 150) ? nextStory(s, now) : undefined;
+  const input = story ? [slot(story.id, undefined, { practice: 'story', ref: story.id })] : [];
 
   // Listening: one dialogue the learner can fully follow (most advanced first, not heard in 3 days),
   // then words heard least recently (including today's new ones).
@@ -256,7 +315,7 @@ export function buildQueue(s: LearnerState, plan: SessionPlan, now: Date, opts: 
 
   // Close by retrieving today's new words again, from production if it has unlocked by then.
   const closing = fresh.filter((id) => id.startsWith('w:')).map((id) => slot(id, 'recall'));
-  return [...warm, ...main, ...listening, ...speaking, ...drills, ...closing];
+  return [...warm, ...main, ...input, ...listening, ...speaking, ...drills, ...closing];
 }
 
 // ───────────── Learning steps ─────────────
@@ -351,9 +410,9 @@ export interface Practice {
   sessionId?: number;
 }
 
-/** Shadowing and dialogues aren't reviews: they move the speaking/listening ability, not FSRS. */
+/** Shadowing, dialogues and stories aren't reviews: they move the speaking/listening/reading ability, not FSRS. */
 export function applyPractice(s: LearnerState, p: Practice, now: Date): Writes {
-  const skill: Skill = p.slot.practice === 'dialogue' ? 'listening' : 'speaking';
+  const skill: Skill = p.slot.practice === 'dialogue' ? 'listening' : p.slot.practice === 'story' ? 'reading' : 'speaking';
   return {
     abilities: [updateAbility(s.abilities.get(skill) ?? { skill, theta: 0, n: 0, updatedAt: 0 }, p.level, p.correct, +now)],
     events: [{
