@@ -225,6 +225,8 @@ export interface UserProfile {
   showEnglish: boolean;
   /** Set by "fewer/more new words"; overrides the meta-learning cap. */
   newItemCap?: number;
+  /** Last JSON backup the learner saved (for the monthly reminder). */
+  backupAt?: number;
 }
 
 export interface SRSState {

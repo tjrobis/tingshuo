@@ -117,13 +117,15 @@ its full content is captured in the `answer` LearningEvent, so history is reprod
 ## Migrations
 
 - Dexie versioned schema; each version bump adds an `upgrade()` that transforms old rows.
-- Export files carry `{ app: 'tingshuo', schemaVersion, exportedAt }`; import refuses newer schema
-  versions and migrates older ones.
+- Backups (`backup.ts`) carry `{ app: 'tingshuo', schemaVersion, exportedAt, tables }` with every learner
+  table except `secrets` (never), `recordings` (audio) and `aiLog`. Restoring replaces those tables
+  (Dates revived explicitly), refuses newer schema versions, and accepts older ones (versions only
+  ever add tables).
 - Curriculum id changes require an id-alias map (`src/data/aliases.ts`) so learner state follows.
 
 ## Integrity rules (tested)
 
 - `srs.id === itemId + '|' + facet`; facet must be valid for the item's kind.
 - `card.due` is a Date; stability > 0 after first review; no NaN anywhere (guarded in `srs/` with tests).
-- Event log is append-only; mastery and abilities can be fully rebuilt from `events` + `reviews`
-  (`rebuildLearnerModel()` is used by the debug view and tests).
+- Event log is append-only. `checkIntegrity()` (Diagnostics, tests) checks the rules above against the
+  loaded model: ids, curriculum membership, finite card numbers, valid due dates, a mastery record per item.

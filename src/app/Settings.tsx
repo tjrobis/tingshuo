@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PROVIDERS } from '../lib/ai';
 import { chineseVoices, micSupported, speak, startRecording, sttSupported } from '../lib/audio';
+import { ankiTsv, exportBackup, importBackup, parseWordList, saveFile, wordsCsv } from '../lib/backup';
 import { IMMERSION_LEVELS } from '../lib/commands';
-import { db } from '../lib/db';
+import { db, persist } from '../lib/db';
 import { pitchTrack, updateSpeaker } from '../lib/pitch';
+import { commit, isIntroduced, seedKnown, type LearnerState } from '../lib/session';
 import { ask } from '../lib/tutor';
 import type { AIProviderId, ImmersionLevel, PinyinMode, UserProfile } from '../lib/types';
 import { Button, Card, Chip, Label, Screen } from './ui';
@@ -11,7 +13,10 @@ import { Button, Card, Chip, Label, Screen } from './ui';
 const SPEEDS: [number, string][] = [[0.6, '0.6× learning'], [0.75, '0.75×'], [1, '1× normal'], [1.15, '1.15× fast']];
 const PINYIN: [PinyinMode, string][] = [['new', 'Until I know the word'], ['always', 'Always'], ['tap', 'Tap to show'], ['never', 'Never']];
 
-export function Settings({ profile, onChange, onBack }: { profile: UserProfile; onChange: (p: Partial<UserProfile>) => void; onBack: () => void }) {
+export function Settings({ state, onChange, onBack, onDebug }: {
+  state: LearnerState; onChange: (p: Partial<UserProfile>) => void; onBack: () => void; onDebug: () => void;
+}) {
+  const profile = state.profile;
   const [voices, setVoices] = useState(chineseVoices);
   const [mic, setMic] = useState('');
 
@@ -144,6 +149,7 @@ export function Settings({ profile, onChange, onBack }: { profile: UserProfile; 
           </label>
         )}
       </Card>
+      <DataSettings state={state} onChange={onChange} onDebug={onDebug} />
     </Screen>
   );
 }
@@ -219,6 +225,87 @@ function AiSettings({ profile, onChange }: { profile: UserProfile; onChange: (p:
           </div>
         </>
       )}
+    </Card>
+  );
+}
+
+/** Backup/restore, word-list export and import, diagnostics, erase. Everything stays on the device unless the learner saves a file. */
+function DataSettings({ state, onChange, onDebug }: { state: LearnerState; onChange: (p: Partial<UserProfile>) => void; onDebug: () => void }) {
+  const [note, setNote] = useState('');
+  const [list, setList] = useState<{ known: string[]; outside: string[] }>();
+  const restoreInput = useRef<HTMLInputElement>(null);
+  const listInput = useRef<HTMLInputElement>(null);
+  const day = new Date().toISOString().slice(0, 10);
+  const fresh = list?.known.filter((id) => !isIntroduced(state, id)) ?? [];
+
+  async function backup() {
+    await saveFile(`tingshuo-backup-${day}.json`, JSON.stringify(await exportBackup()), 'application/json');
+    onChange({ backupAt: Date.now() });
+    setNote('Backup saved. Keep it somewhere safe, such as iCloud Drive.');
+  }
+  async function restore(file?: File) {
+    if (!file || !confirm('Replace everything on this device with this backup? The progress here now will be overwritten.')) return;
+    try {
+      await importBackup(await file.text());
+      location.reload();
+    } catch (e) {
+      setNote((e as Error).message);
+    }
+  }
+  async function markKnown() {
+    const w = seedKnown(state, fresh, new Date());
+    commit(state, w);
+    await persist(w);
+    setNote(`${fresh.length} words marked as known. They come back soon for a review, to check.`);
+    setList(undefined);
+  }
+  async function erase() {
+    if (!confirm("Erase all your learning data on this device? This can't be undone, so back up first if you might want it.")) return;
+    await db.delete();
+    location.reload();
+  }
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <Label>Your data</Label>
+      <p className="text-sm">
+        Your progress is stored only on this device. {state.profile.backupAt ? `Last backup: ${new Date(state.profile.backupAt).toLocaleDateString()}.` : 'No backup yet.'}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={() => void backup()}>Back up</Button>
+        <Button variant="secondary" onClick={() => restoreInput.current?.click()}>Restore…</Button>
+      </div>
+      <p className="text-xs text-slate-500">A backup holds all your progress, but not API keys or voice recordings. Restoring replaces what's on this device.</p>
+
+      <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Your words</div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="secondary" onClick={() => void saveFile(`tingshuo-words-${day}.csv`, wordsCsv(state, new Date()), 'text/csv')}>Spreadsheet</Button>
+        <Button variant="secondary" onClick={() => void saveFile(`tingshuo-anki-${day}.txt`, ankiTsv(state), 'text/plain')}>Anki deck</Button>
+      </div>
+      <Button variant="ghost" onClick={() => listInput.current?.click()}>Import words I already know…</Button>
+      {list && (
+        <div className="flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
+          <p>
+            {list.known.length} course words found{list.known.length > fresh.length ? ` (${list.known.length - fresh.length} already learned)` : ''}.
+            {list.outside.length > 0 && ` ${list.outside.length} not in the course yet: ${list.outside.slice(0, 8).join(' ')}${list.outside.length > 8 ? '…' : ''}`}
+          </p>
+          {fresh.length > 0 && <Button onClick={() => void markKnown()}>Mark {fresh.length} as known</Button>}
+          <p className="text-xs text-slate-500">They start as reviewed once, so they come back soon to check. Words outside the course aren't added: the course only teaches checked content.</p>
+        </div>
+      )}
+      {note && <p role="status" className="text-sm">{note}</p>}
+      <input ref={restoreInput} type="file" accept="application/json,.json" className="hidden" onChange={(e) => void restore(e.target.files?.[0])} />
+      <input ref={listInput} type="file" accept=".txt,.csv,.tsv,text/plain,text/csv,text/tab-separated-values" className="hidden"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (file) setList(parseWordList(await file.text()));
+        }} />
+
+      <div className="flex justify-between gap-2 border-t border-slate-100 pt-3 text-sm dark:border-slate-800">
+        <button type="button" className="text-slate-500 underline" onClick={onDebug}>Diagnostics</button>
+        <button type="button" className="text-rose-600 underline" onClick={() => void erase()}>Erase everything</button>
+      </div>
     </Card>
   );
 }

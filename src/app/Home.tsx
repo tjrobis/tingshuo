@@ -64,6 +64,7 @@ export function Home({ state, audio, onLearn, onOpen, onProfile }: {
   const solid = skills.filter((x) => !x.band.tentative).sort((a, b) => b.a.theta - a.a.theta);
   const recurring = errorPatterns(state.errors, [], +now).filter((p) => p.status === 'recurring');
   const story = nextStory(state, now);
+  const backupDue = [...state.mastery.values()].filter((m) => m.introducedAt !== undefined).length >= 20 && +now - (state.profile.backupAt ?? 0) > 30 * 86_400_000;
 
   function setLength(m: number) {
     setMinutes(m);
@@ -203,6 +204,13 @@ export function Home({ state, audio, onLearn, onOpen, onProfile }: {
           <Label>Keeps tripping you up</Label>
           {recurring.slice(0, 5).map((p) => <div key={p.key} className="text-sm">{p.label} <span className="text-slate-500">({p.count}×)</span></div>)}
           <p className="text-xs text-slate-500">These get targeted drills in your sessions.</p>
+        </Card>
+      )}
+
+      {backupDue && (
+        <Card className="flex items-center gap-3">
+          <p className="flex-1 text-sm"><b>Back up your progress.</b> It lives only on this device; a backup in iCloud Drive keeps it safe.</p>
+          <Button variant="secondary" className="shrink-0" onClick={() => onOpen('settings')}>Back up</Button>
         </Card>
       )}
 

@@ -81,7 +81,8 @@ src/
                  Pronunciation (tone-pair grid trainer), Settings (incl. AI provider), Recorder (recording,
                  contour plot, review), Tutor (AI conversation, review, offline roleplay), Reader (story list,
                  story view, tappable text with a word sheet; also used by sessions and the tutor), Progress
-                 (achievements, benchmarks, insights, knowledge map), Command ("tell the app…" box)
+                 (achievements, benchmarks, insights, knowledge map), Command ("tell the app…" box), Debug
+                 (diagnostics, from Settings)
                  (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
@@ -105,6 +106,7 @@ src/
                    graded AI stories (brief, parse, coverage check, one rewrite), mission checks, request log
     progress.ts    derived analytics: meta-learning experiments + planner policy, achievements, fixed-form
                    benchmarks (seeded, comparable over time)
+    backup.ts      JSON backup/restore, CSV/Anki exports, word-list import, integrity check, share-sheet saving
     commands.ts    natural-language commands → profile changes (rules first, AI only picks among them),
                    immersion levels and the button-label translation they drive
 ```
@@ -190,4 +192,6 @@ npm run build       # production PWA in dist/
 npm run check       # all of the above
 ```
 
-Deployment: `dist/` is static; deploy to GitHub Pages, Cloudflare Pages or Netlify (free tiers).
+Deployment: `dist/` is static (relative paths, so any sub-path works); deploy to GitHub Pages, Cloudflare
+Pages or Netlify (free tiers). It must be HTTPS for the microphone and the service worker. On the
+iPhone: open the URL in Safari → Share → Add to Home Screen.

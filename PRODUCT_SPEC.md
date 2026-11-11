@@ -69,7 +69,7 @@ placeholder; limited features say so in the UI.
 | Missions | Real-world challenges: practised with the AI tutor (checked on the device as you type) or done for real and self-reported | ✅ |
 | NL commands | Deterministic intent parser + optional AI fallback → persistent preferences | ✅ |
 | Immersion | 5-level slider: tutor language ratio, translations hidden by default, main button labels in Chinese | 🟡 (only the most common button labels are translated) |
-| Data | JSON backup/restore, CSV, Anki-compatible TSV export/import | ✅ |
+| Data | JSON backup/restore, CSV and Anki exports, importing a word list as already-known course words | ✅ |
 | Offline | PWA; reviews, lessons, dictionary, progress offline | ✅ (TTS voice availability depends on device) |
 | Debug | Hidden dashboard: learner model, SRS table, planner decisions, AI log, validation report | ✅ |
 | Sync | Multi-device sync | ⏳ (export/import is the interim path) |

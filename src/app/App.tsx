@@ -5,6 +5,7 @@ import { db, loadState, requestPersistence } from '../lib/db';
 import { syncAchievements } from '../lib/progress';
 import type { LearnerState } from '../lib/session';
 import type { UserProfile } from '../lib/types';
+import { Debug } from './Debug';
 import { Home } from './Home';
 import { Onboarding } from './Onboarding';
 import { Placement } from './Placement';
@@ -15,7 +16,7 @@ import { Session } from './Session';
 import { Settings } from './Settings';
 import { Tutor } from './Tutor';
 
-type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' } | { name: 'tutor' } | { name: 'reader'; story?: string } | { name: 'progress' };
+type View = { name: 'home' } | { name: 'session'; minutes: number } | { name: 'pronunciation' } | { name: 'settings' } | { name: 'tutor' } | { name: 'reader'; story?: string } | { name: 'progress' } | { name: 'debug' };
 
 export default function App() {
   const [state, setState] = useState<LearnerState | null>();
@@ -62,7 +63,9 @@ export default function App() {
     case 'tutor':
       return <Tutor state={state} audio={audio} onBack={home} />;
     case 'settings':
-      return <Settings profile={state.profile} onChange={updateProfile} onBack={home} />;
+      return <Settings state={state} onChange={updateProfile} onBack={home} onDebug={() => setView({ name: 'debug' })} />;
+    case 'debug':
+      return <Debug state={state} audio={audio} onBack={() => setView({ name: 'settings' })} />;
     default:
       return (
         <Home
