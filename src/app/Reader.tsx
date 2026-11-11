@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useRef, useState } from 'react';
 import { PROVIDERS } from '../lib/ai';
 import { speak } from '../lib/audio';
+import { t } from '../lib/commands';
 import { characters, stories, wordById } from '../lib/curriculum';
 import { db, persist } from '../lib/db';
 import { masteryStatus } from '../lib/learner';
@@ -255,7 +256,7 @@ export function StoryView({ state, story, audio, sessionId, onDone }: {
           ))}
         </Card>
       )}
-      <Button disabled={!finished} onClick={done} className="py-4 text-lg">{finished ? 'Done' : 'Answer the questions to finish'}</Button>
+      <Button disabled={!finished} onClick={done} className="py-4 text-lg">{finished ? t('Done') : 'Answer the questions to finish'}</Button>
 
     </div>
   );

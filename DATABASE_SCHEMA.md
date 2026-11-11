@@ -31,11 +31,14 @@ Unit { n; title; titleZh; goal /* "After this unit you can…" */; milestone? }
 toneSets { base; chars /* one per tone */ }   soundPairs { id /* s:zh-j */; label; pair }
 ```
 
-Dialogue, Story, Roleplay and Mission types land with the slices that use them (5–8).
+Dialogue (slice 5), Story (7) and Mission (8) types are in `types.ts`; missions are a pipe table like the rest.
 
 ## Learner tables (Dexie)
 
-Version 4 (slice 7) adds `generated` (AI-written stories with their validation report; never merged
+Version 5 (slice 8) adds `achievements` (when each capability was first met; whether it is met is
+derived). Meta-learning insights and the planner policy are derived from history on read, so there
+is no `policy` or `insights` table; `AssessmentRecord.form` names the benchmark form, and
+`UserProfile.newItemCap` holds a learner's own "fewer/more new words" setting. Version 4 (slice 7) adds `generated` (AI-written stories with their validation report; never merged
 into the curriculum). Version 3 (slice 6) adds `secrets` (API keys: never exported or logged), `conversations`, `messages`
 and `aiLog` (every AI request and response, without keys). Version 2 (slice 5) adds `pronunciation` (every analysed spoken attempt) and `recordings` (the learner's
 audio, pruned to the newest `privacy.keepRecordings`, default 50). Version 1 creates the tables the learning loop uses: `profile`, `srs`, `mastery`, `events`, `reviews`,
@@ -45,7 +48,6 @@ the slice that first needs them. `patterns` is not a table: patterns are derived
 | Table | Primary key | Indexes | Purpose |
 |-------|-------------|---------|---------|
 | `profile` | `id` (`'me'`) | — | **User** + preferences + **Interest**[] + **Goal**[] + AI config (non-secret) |
-| `policy` | `id` (`'me'`) | — | Parameters tuned by meta-learning (new-item cap, intro modality, k_format…) |
 | `srs` | `id` = `itemId|facet` | `itemId`, `facet`, `due`, `[facet+due]` | **SRSState** — FSRS card per facet |
 | `mastery` | `itemId` | `kind`, `lastSeen` | **MasteryState** — per-item statistics |
 | `events` | `++id` | `at`, `type`, `itemId`, `sessionId` | **LearningEvent** — append-only granular log |
@@ -61,8 +63,7 @@ the slice that first needs them. `patterns` is not a table: patterns are derived
 | `generated` | `++id` | `kind`, `createdAt` | AI-generated stories/sentences + validation report |
 | `customItems` | `id` | — | User-added / imported vocabulary (`verified:false`) |
 | `aiLog` | `++id` | `at` | AI request/response log (keys redacted) |
-| `insights` | `id` | — | Meta-learning insights with evidence |
-| `achievements` | `id` | — | Unlocked achievements |
+| `achievements` | `id` | `unlockedAt` | When each achievement was first met |
 | `secrets` | `provider` | — | API keys. **Never exported, never logged.** |
 
 ### Core learner record shapes

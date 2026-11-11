@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { playBlob, speak } from '../lib/audio';
+import { t } from '../lib/commands';
 import type { Exercise, Response } from '../lib/exercise';
 import type { GradeResult, Verdict } from '../lib/grade';
 import type { Speaker } from '../lib/pitch';
@@ -85,8 +86,8 @@ export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverri
       <div className="flex items-center justify-between gap-2">
         <Label>{ex.instruction}</Label>
         <div className="flex gap-1">
-          <Button variant="ghost" className="px-3 py-1.5 text-sm" onClick={() => openPanel('confused')}>I'm confused</Button>
-          <Button variant="ghost" className="px-3 py-1.5 text-sm" onClick={() => openPanel('why')}>Why this?</Button>
+          <Button variant="ghost" className="px-3 py-1.5 text-sm" onClick={() => openPanel('confused')}>{t("I'm confused")}</Button>
+          <Button variant="ghost" className="px-3 py-1.5 text-sm" onClick={() => openPanel('why')}>{t('Why this?')}</Button>
         </div>
       </div>
 
@@ -185,7 +186,7 @@ export function ExerciseView({ ex, audio, result, onSubmit, onContinue, onOverri
       )}
 
       {(answered || intro) && result?.verdict !== 'unsure' && (
-        <Button onClick={onContinue} className="mt-auto py-4 text-lg" autoFocus>{intro ? 'Got it' : 'Continue'}</Button>
+        <Button onClick={onContinue} className="mt-auto py-4 text-lg" autoFocus>{t(intro ? 'Got it' : 'Continue')}</Button>
       )}
     </div>
   );
@@ -222,7 +223,7 @@ function AnswerInput({ ex, text, setText, tiles, setTiles, onSubmit, submitText 
               className="rounded-xl bg-slate-100 px-3 py-2 text-xl disabled:opacity-20 dark:bg-slate-800">{t}</button>
           ))}
         </div>
-        <Button disabled={chosen.length !== ex.tiles.length} onClick={() => onSubmit({ order: chosen })}>Check</Button>
+        <Button disabled={chosen.length !== ex.tiles.length} onClick={() => onSubmit({ order: chosen })}>{t('Check')}</Button>
       </div>
     );
   }
@@ -238,7 +239,7 @@ function AnswerInput({ ex, text, setText, tiles, setTiles, onSubmit, submitText 
         placeholder={english ? 'Answer in English' : ex.pinyinOnly ? 'Pinyin with tone numbers, e.g. ni3 hao3' : 'Pinyin (ni3 hao3) or 汉字'}
         className="rounded-2xl bg-white px-4 py-4 text-xl ring-1 ring-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-900 dark:ring-slate-700"
       />
-      <Button type="submit" disabled={!text.trim()}>Check</Button>
+      <Button type="submit" disabled={!text.trim()}>{t('Check')}</Button>
     </form>
   );
 }

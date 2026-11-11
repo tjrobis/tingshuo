@@ -2,9 +2,10 @@
 // MediaRecorder for the learner. Nothing here is sent anywhere.
 
 // ───────────── Speech out ─────────────
-const isChinese = (v: SpeechSynthesisVoice) => /^zh([-_](CN|Hans))?$/i.test(v.lang) || /^cmn/i.test(v.lang);
+const ELOQUENCE = /^(Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/; // iOS/macOS novelty voices: rough tones
+const isChinese = (v: SpeechSynthesisVoice) => (/^zh([-_](CN|Hans))?$/i.test(v.lang) || /^cmn/i.test(v.lang)) && !ELOQUENCE.test(v.name);
 const score = (v: SpeechSynthesisVoice) =>
-  (/natural|neural|online|premium|enhanced/i.test(v.name) ? 2 : 0) + (/xiaoxiao|yunxi|tingting|google/i.test(v.name) ? 1 : 0);
+  (/natural|neural|online|premium|enhanced/i.test(v.name) ? 2 : 0) + (/xiaoxiao|yunxi|tingting|lili|google/i.test(v.name) ? 1 : 0);
 
 /** Mainland Chinese voices, best first. */
 export const chineseVoices = (): SpeechSynthesisVoice[] =>

@@ -144,35 +144,16 @@ export interface Unit {
   milestone?: string;
 }
 
-/** A scripted roleplay used when no AI provider is configured (and as structured practice). */
-export interface Roleplay {
-  id: string;
-  title: string;
-  scenario: string;
-  unit: number;
-  topics: string[];
-  turns: RoleplayTurn[];
-}
-
-export interface RoleplayTurn {
-  tutor: string; // tokenised Chinese
-  tutorEn: string;
-  /** Accepted learner responses: tokenised Chinese patterns; `{slot}` matches any known word of that slot type. */
-  expect: string[];
-  model: string; // model answer (tokenised)
-  modelEn: string;
-  hint: string; // English hint
-}
-
+/** A real-world task: done with the AI tutor (checked on the device) or for real (self-reported). */
 export interface Mission {
   id: string;
-  title: string;
-  description: string;
   unit: number;
-  kind: 'roleplay' | 'speak' | 'listen' | 'write';
-  roleplayId?: string;
-  targetSeconds?: number;
-  successCriteria: string;
+  title: string;
+  scenario: string; // tutor scenario id
+  brief: string;
+  /** Each check passes when the learner wrote any of `any` (characters). */
+  checks: { label: string; any: string[] }[];
+  minutes?: number;
 }
 
 // ───────────────────────── Learner data ─────────────────────────
@@ -242,17 +223,8 @@ export interface UserProfile {
   speaker?: { floorHz: number; ceilHz: number; n: number };
   micAvailable?: boolean;
   showEnglish: boolean;
-}
-
-export interface LearnerPolicy {
-  id: 'me';
-  newItemCap: number;
-  introModality: 'audio' | 'text' | 'explore';
-  /** Per-format difficulty exponent calibrations (multipliers on the defaults). */
-  formatK: Record<string, number>;
-  comprehensionTarget: number; // e.g. 0.92
-  updatedAt: number;
-  notes: string[];
+  /** Set by "fewer/more new words"; overrides the meta-learning cap. */
+  newItemCap?: number;
 }
 
 export interface SRSState {
@@ -475,6 +447,8 @@ export interface AssessmentRecord {
   id?: number;
   at: number;
   kind: 'placement' | 'benchmark';
+  /** Benchmark form id: results are only compared within the same form. */
+  form?: string;
   results: { skill: string; correct: number; total: number; detail?: string }[];
   estimates: Record<string, number>;
   items: { id: string; skill: string; correct: boolean; rtMs?: number }[];
@@ -523,17 +497,6 @@ export interface AILogEntry {
   ok: boolean;
   error?: string;
   usage?: Record<string, number>;
-}
-
-export interface MetaInsight {
-  id: string;
-  title: string;
-  detail: string;
-  evidence: string;
-  probability: number;
-  n: number;
-  createdAt: number;
-  applied?: string;
 }
 
 export interface AchievementRecord {

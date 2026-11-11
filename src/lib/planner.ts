@@ -26,6 +26,8 @@ export interface PlanInput {
   focus: FocusBoost[];
   newItemCap: number;
   newAvailable: number;
+  /** Batch-size experiment: −1, 0 or +1 new words today. */
+  explore?: number;
 }
 
 export interface SessionPlan {
@@ -54,7 +56,7 @@ export function planSession(p: PlanInput): SessionPlan {
   const early = p.daysActive < 14;
   const weakTones = p.toneAccuracy !== null && p.toneAccuracy < 0.7;
   const weights: [PlanBlock['kind'], number, string][] = [
-    ['warmup', p.audio ? (early || weakTones ? 0.25 : 0.1) + (p.toneConfusion ? 0.1 : 0) : 0,
+    ['warmup', p.audio ? ((early || weakTones ? 0.25 : 0.1) + (p.toneConfusion ? 0.1 : 0)) * boost('tones') : 0,
       weakTones ? `Tone accuracy is ${pct(p.toneAccuracy!)}, so tones get extra time.`
       : early ? 'First two weeks: tones get extra time so bad habits never form.'
       : 'Tone and pronunciation warm-up.'],
@@ -78,7 +80,8 @@ export function planSession(p: PlanInput): SessionPlan {
   }
   if (backlog) mult *= 0.5;
   const budget = weights.some(([, w]) => w > 0) ? Math.round((T / 4) * mult) : Math.floor(p.newItemCap * mult);
-  const newItems = Math.max(0, Math.min(p.newAvailable, p.newItemCap, budget, Math.floor(((T - reviewMin) * 60) / NEW_SEC)));
+  const planned = Math.max(0, Math.min(p.newAvailable, p.newItemCap, budget, Math.floor(((T - reviewMin) * 60) / NEW_SEC)));
+  const newItems = planned ? Math.max(0, Math.min(p.newAvailable, p.newItemCap, planned + (p.explore ?? 0))) : 0;
   const newMin = (newItems * NEW_SEC) / 60;
 
   const rest = Math.max(0, T - reviewMin - newMin);

@@ -1,9 +1,10 @@
 // Content validation (LEARNING_ENGINE.md §9): curated Mandarin must pass these before it can be taught.
 import { pinyin, polyphonic } from 'pinyin-pro';
 import { describe, expect, it } from 'vitest';
-import { characters, dialogues, grammar, sentences, sentenceWords, soundPairs, stories, tonePairWords, toneSets, units, wordById, words } from './curriculum';
+import { characters, dialogues, grammar, missions, sentences, sentenceWords, soundPairs, stories, tonePairWords, toneSets, units, wordById, words } from './curriculum';
 import { parseNumbered } from './pinyin';
 import { splitTokenised } from './segment';
+import { SCENARIOS } from './tutor';
 
 const split = (p: string) => {
   const m = /^([a-zü]+)([0-5])$/.exec(p.replace(/v/g, 'ü'));
@@ -173,6 +174,20 @@ describe('stories', () => {
       expect(st.paragraphs.every((p) => p.length) && lines.every((l) => l.en), st.id).toBe(true);
       expect(st.questions.length, st.id).toBeGreaterThanOrEqual(2);
       for (const q of st.questions) expect(new Set(q.options).size, `${st.id}: ${q.q}`).toBe(3);
+    }
+  });
+});
+
+describe('missions', () => {
+  it('use real tutor scenarios, and every check can be passed with words taught by the mission\'s unit', () => {
+    expect(missions.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(missions.map((m) => m.id)).size).toBe(missions.length);
+    for (const m of missions) {
+      expect(SCENARIOS.some((x) => x.id === m.scenario), m.id).toBe(true);
+      expect(units.some((u) => u.n === m.unit), m.id).toBe(true);
+      expect(m.checks.length, m.id).toBeGreaterThanOrEqual(2);
+      const taught = new Set(words.filter((w) => w.unit <= m.unit).flatMap((w) => Array.from(w.hanzi)));
+      for (const c of m.checks) expect(c.any.some((x) => Array.from(x).every((ch) => taught.has(ch))), `${m.id}: ${c.label}`).toBe(true);
     }
   });
 });

@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { listen, speak, sttSupported } from '../lib/audio';
-import { dialogues, pinyinText, surface } from '../lib/curriculum';
+import { t } from '../lib/commands';
+import { dialogues, missions, pinyinText, surface, words } from '../lib/curriculum';
 import { splitTokenised } from '../lib/segment';
 import { db, persist } from '../lib/db';
 import { PROVIDERS } from '../lib/ai';
-import { applyPractice, isIntroduced, ITEMS, type LearnerState } from '../lib/session';
+import { applyPractice, commit, isIntroduced, ITEMS, type LearnerState } from '../lib/session';
 import {
-  aiReady, ask, correctionsToErrors, MODES, parseReply, pinyinOf, REPLY_SCHEMA, SCENARIOS, systemPrompt, toMessages, tokensOf, tutorContext, unknownWords,
+  aiReady, ask, correctionsToErrors, missionChecks, missionSetup, MODES, parseReply, pinyinOf, REPLY_SCHEMA, SCENARIOS, systemPrompt, toMessages, tokensOf, tutorContext, unknownWords,
 } from '../lib/tutor';
-import type { CorrectionItem, Dialogue, TutorMode } from '../lib/types';
+import type { CorrectionItem, Dialogue, Mission, TutorMode } from '../lib/types';
 import { TapText } from './Reader';
 import { Button, Card, Chip, Label, Screen, Speak } from './ui';
 
@@ -49,7 +50,8 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
   const [voice, setVoice] = useState(audio);
   const [english, setEnglish] = useState(true);
   const [listening, setListening] = useState<ReturnType<typeof listen>>();
-  const [summary, setSummary] = useState<{ minutes: number; corrections: CorrectionItem[] }>({ minutes: 0, corrections: [] });
+  const [summary, setSummary] = useState<{ minutes: number; corrections: CorrectionItem[]; mission?: boolean[] }>({ minutes: 0, corrections: [] });
+  const [mission, setMission] = useState<Mission>();
   const conversation = useRef<{ id?: number; started: number }>({ started: 0 });
   const bottom = useRef<HTMLDivElement>(null);
   const provider = PROVIDERS[state.profile.ai.provider as keyof typeof PROVIDERS];
@@ -68,7 +70,7 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
     setBusy(true);
     setError('');
     try {
-      const system = systemPrompt(tutorContext(state), mode, scenario.setup);
+      const system = systemPrompt(tutorContext(state), mode, mission ? missionSetup(mission, scenario.setup) : scenario.setup);
       let raw = await ask(state.profile, { purpose: 'tutor', system, messages: toMessages(history), schema: REPLY_SCHEMA });
       let reply = parseReply(raw);
       let check = unknownWords(state, reply.reply);
@@ -102,7 +104,7 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
     conversation.current.id = await db.conversations.add({
       startedAt: conversation.current.started, mode, scenario: scenario.id, provider: state.profile.ai.provider, minutes: 0, chineseOnly: mode === 'immersion', turns: 0,
     });
-    setEnglish(mode !== 'immersion');
+    setEnglish(mode !== 'immersion' && state.profile.immersion < 2); // from immersion level 2, translations wait to be asked for
     setPhase('chat');
     void tutorTurn([]);
   }
@@ -133,7 +135,19 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
         endedAt: now, minutes: (now - conversation.current.started) / 60_000, turns: turns.filter((t) => t.role === 'learner').length, review: corrections,
       });
     }
-    setSummary({ minutes: (now - conversation.current.started) / 60_000, corrections });
+    const minutes = (now - conversation.current.started) / 60_000;
+    let checks: boolean[] | undefined;
+    if (mission) {
+      const said = turns.filter((t) => t.role === 'learner').map((t) => t.text);
+      checks = missionChecks(mission, said);
+      const w = applyPractice(state, {
+        slot: { key: mission.id, itemId: mission.id, practice: 'mission', ref: mission.id }, correct: checks.every(Boolean) && minutes >= (mission.minutes ?? 0),
+        level: 0.4 * mission.unit, rtMs: 0, given: said.join(' / ').slice(0, 500), expected: mission.checks.map((c) => c.label).join('; '),
+      }, new Date(now));
+      commit(state, w);
+      void persist(w);
+    }
+    setSummary({ minutes, corrections, mission: checks });
     setPhase('review');
   }
 
@@ -154,13 +168,24 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
             {SCENARIOS.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
           </select>
         </Card>
+        <MissionList state={state} onPractise={(m) => {
+          setMission(m);
+          setScenario(SCENARIOS.find((x) => x.id === m.scenario)!);
+          setMode('roleplay');
+        }} />
+        {mission && (
+          <Card className="flex items-start gap-2 text-sm">
+            <p className="flex-1"><b>Mission: {mission.title}.</b> {mission.brief}</p>
+            <Button variant="ghost" className="px-2 py-1 text-sm" onClick={() => setMission(undefined)}>Clear</Button>
+          </Card>
+        )}
         {tutorContext(state).known.length < 20 && (
           <Card className="text-sm">
             The tutor sticks to words you've learned, and you know {tutorContext(state).known.length} so far, so it works best after a few lessons. New words it uses are flagged.
           </Card>
         )}
         <p className="text-center text-xs text-slate-500">Your messages and the words you know are sent to {provider.label}. Pinyin and word checks are done on this device.</p>
-        <Button onClick={() => void start()} className="py-4 text-lg">Start talking</Button>
+        <Button onClick={() => void start()} className="py-4 text-lg">{mission ? 'Start the mission' : t('Start talking')}</Button>
       </Screen>
     );
   }
@@ -168,6 +193,7 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
   if (phase === 'review') {
     const { corrections } = summary;
     const minutes = Math.max(1, Math.round(summary.minutes));
+    const short = !!mission?.minutes && summary.minutes < mission.minutes;
     return (
       <Screen>
         <Header title="Conversation review" onBack={onBack} />
@@ -175,6 +201,14 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
           <div><div className="text-2xl font-semibold">{turns.filter((t) => t.role === 'learner').length}</div><div className="text-sm text-slate-500">things you said</div></div>
           <div><div className="text-2xl font-semibold">{minutes}</div><div className="text-sm text-slate-500">minutes</div></div>
         </Card>
+        {mission && summary.mission && (
+          <Card className="flex flex-col gap-1">
+            <Label>Mission: {mission.title}</Label>
+            <div className="text-lg font-medium">{summary.mission.every(Boolean) && !short ? 'Done ✓' : `${summary.mission.filter(Boolean).length} of ${mission.checks.length} done`}</div>
+            {mission.checks.map((c, k) => <div key={k} className={summary.mission![k] ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}>{summary.mission![k] ? '✓' : '○'} {c.label}</div>)}
+            {short && <div className="text-slate-500">○ Keep it going for {mission.minutes} minutes</div>}
+          </Card>
+        )}
         {corrections.length ? corrections.map((c, i) => (
           <Card key={i} className="flex flex-col gap-1">
             <div className="text-xs font-semibold text-slate-500 uppercase">You said</div>
@@ -199,6 +233,14 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
           {audio && <Button variant="ghost" className="px-2 py-1 text-sm" onClick={() => setVoice(!voice)}>{voice ? 'Voice on' : 'Voice off'}</Button>}
         </div>
       } />
+      {mission && (
+        <Card className="sticky top-0 z-10 flex flex-col gap-0.5 py-3 text-sm">
+          <div className="font-medium">Mission: {mission.title}{mission.minutes ? ` · ${mission.minutes} min` : ''}</div>
+          {missionChecks(mission, turns.filter((x) => x.role === 'learner').map((x) => x.text)).map((ok, k) => (
+            <div key={k} className={ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}>{ok ? '✓' : '○'} {mission.checks[k].label}</div>
+          ))}
+        </Card>
+      )}
       <div className="flex flex-1 flex-col gap-3">
         {turns.map((t, i) => t.role === 'tutor' ? (
           <div key={i} className="max-w-[85%] self-start rounded-3xl rounded-tl-md bg-white p-4 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
@@ -236,8 +278,8 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
         {error && <Card className="text-sm text-rose-600">{error}</Card>}
         <div ref={bottom} />
       </div>
-      <form onSubmit={(e) => { e.preventDefault(); send(); }} className="sticky bottom-0 flex gap-2 bg-white/90 py-2 backdrop-blur dark:bg-slate-950/90">
-        <input value={input} onChange={(e) => setInput(e.target.value)} lang="zh" placeholder="说中文… (or pinyin)" autoComplete="off"
+      <form onSubmit={(e) => { e.preventDefault(); send(); }} className="sticky bottom-0 flex gap-2 bg-white/90 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur dark:bg-slate-950/90">
+        <input value={input} onChange={(e) => setInput(e.target.value)} lang="zh" placeholder="说中文… (or pinyin)" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} enterKeyHint="send"
           className="flex-1 rounded-2xl bg-slate-100 px-4 py-3 text-lg outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-slate-800" />
         {state.profile.privacy.stt && sttSupported() && (
           <Button variant={listening ? 'bad' : 'secondary'} onClick={() => void mic()} aria-label={listening ? 'Stop listening' : 'Speak'}>{listening ? '■' : '🎤'}</Button>
@@ -246,7 +288,7 @@ function AiTutor({ state, audio, onBack }: { state: LearnerState; audio: boolean
       </form>
       <div className="flex justify-between text-xs text-slate-500">
         <span>{state.profile.privacy.stt && sttSupported() ? 'The 🎤 uses your browser’s speech recognition.' : "Tip: your keyboard's dictation mic works for speaking."}</span>
-        <button type="button" className="underline" onClick={() => void end()}>End & review</button>
+        <button type="button" className="underline" onClick={() => void end()}>{t('End & review')}</button>
       </div>
     </Screen>
   );
@@ -287,6 +329,7 @@ function Roleplay({ state, audio, onBack }: { state: LearnerState; audio: boolea
           <p><b>Roleplay offline.</b> You play the second speaker: hear a line, answer it, then compare with a model answer.</p>
           <p className="text-slate-500">For free conversation with an AI tutor, add a provider in Settings (a free Gemini key or a local model works).</p>
         </Card>
+        <MissionList state={state} />
         {dialogues.map((d) => (
           <Button key={d.id} variant="secondary" className="flex justify-between text-left" onClick={() => { setDialogue(d); setLine(0); setScores([]); }}>
             <span>{d.title}</span>
@@ -326,7 +369,7 @@ function Roleplay({ state, audio, onBack }: { state: LearnerState; audio: boolea
           <p className="text-sm text-slate-500">Hint: {current.en}</p>
           {!revealed ? (
             <form onSubmit={(e) => { e.preventDefault(); setRevealed(true); }} className="flex flex-col gap-2">
-              <input autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} lang="zh" placeholder="Say it aloud, or type it" className="rounded-2xl bg-slate-100 px-4 py-3 text-lg dark:bg-slate-800" />
+              <input autoFocus value={answer} onChange={(e) => setAnswer(e.target.value)} lang="zh" placeholder="Say it aloud, or type it" autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} className="rounded-2xl bg-slate-100 px-4 py-3 text-lg dark:bg-slate-800" />
               <Button type="submit">Compare</Button>
             </form>
           ) : (
@@ -343,5 +386,59 @@ function Roleplay({ state, audio, onBack }: { state: LearnerState; audio: boolea
         </Card>
       )}
     </Screen>
+  );
+}
+
+/** Real-world tasks, unlocked by unit. Practised with the tutor (checked as you type), or done for real and self-reported. */
+function MissionList({ state, onPractise }: { state: LearnerState; onPractise?: (m: Mission) => void }) {
+  const [open, setOpen] = useState<string>();
+  const [ticked, setTicked] = useState<boolean[]>([]);
+  const [saved, setSaved] = useState(false);
+  const unit = words.find((w) => !w.incidental && !isIntroduced(state, w.id))?.unit ?? Infinity;
+  const done = new Set(state.answers.filter((e) => e.meta?.practice === 'mission' && e.correct).map((e) => e.meta!.ref));
+
+  function report(m: Mission) {
+    const w = applyPractice(state, {
+      slot: { key: m.id, itemId: m.id, practice: 'mission', ref: m.id }, correct: ticked.every(Boolean), level: 0.4 * m.unit, rtMs: 0,
+      given: `self-report: ${m.checks.filter((_, k) => ticked[k]).map((c) => c.label).join('; ')}`, expected: m.checks.map((c) => c.label).join('; '),
+    }, new Date());
+    commit(state, w);
+    void persist(w);
+    setSaved(true);
+  }
+
+  return (
+    <Card className="flex flex-col gap-2">
+      <Label>Missions</Label>
+      <p className="text-sm text-slate-500">
+        Real tasks to do in Chinese. {onPractise ? 'Practise with the tutor (your messages are checked as you go), or ' : ''}do one for real (with a friend, a teacher, a shop) and tick off what you managed.
+      </p>
+      {missions.map((m) => (
+        <div key={m.id} className="border-t border-slate-100 pt-2 dark:border-slate-800">
+          <button type="button" disabled={m.unit > unit} aria-expanded={open === m.id} className="flex w-full justify-between gap-3 text-left disabled:opacity-40"
+            onClick={() => { setOpen(open === m.id ? undefined : m.id); setTicked(m.checks.map(() => false)); setSaved(false); }}>
+            <span>{done.has(m.id) && <span className="text-emerald-600">✓ </span>}{m.title}</span>
+            <span className="shrink-0 text-sm text-slate-500">{m.unit > unit ? `after unit ${m.unit}` : m.minutes ? `${m.minutes} min` : ''}</span>
+          </button>
+          {open === m.id && (
+            <div className="mt-2 flex flex-col gap-2 rounded-2xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
+              <p>{m.brief}</p>
+              {onPractise && <Button onClick={() => onPractise(m)}>Practise with the tutor</Button>}
+              <div className="text-xs font-semibold tracking-wide text-slate-500 uppercase">Did it for real? Tick what you managed</div>
+              {m.checks.map((c, k) => (
+                <label key={k} className="flex items-center gap-2">
+                  <input type="checkbox" className="accent-indigo-600" checked={!!ticked[k]} disabled={saved}
+                    onChange={(e) => setTicked(Object.assign([...ticked], { [k]: e.target.checked }))} />
+                  {c.label}
+                </label>
+              ))}
+              {saved
+                ? <p className="text-emerald-700 dark:text-emerald-400">{ticked.every(Boolean) ? 'Mission done!' : 'Saved. Try again for the rest.'}</p>
+                : <Button variant="secondary" disabled={!ticked.some(Boolean)} onClick={() => report(m)}>Save</Button>}
+            </div>
+          )}
+        </div>
+      ))}
+    </Card>
   );
 }

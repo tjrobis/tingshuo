@@ -11,7 +11,7 @@ import { masteryStatus } from './learner';
 import { formatWord, parseNumbered } from './pinyin';
 import { segment, type Token } from './segment';
 import { coverageTarget, facetsOf, isIntroduced, ITEMS, knowsWord, storyCoverage, type LearnerState } from './session';
-import type { CorrectionItem, ErrorCategory, ErrorRecord, GeneratedContent, Question, Story, TutorMode, UserProfile, ValidationReport } from './types';
+import type { CorrectionItem, ErrorCategory, ErrorRecord, GeneratedContent, Mission, Question, Story, TutorMode, UserProfile, ValidationReport } from './types';
 
 export const MODES: Record<TutorMode, { label: string; blurb: string; rules: string; newWords: number }> = {
   learning: { label: 'Learning', blurb: 'Corrects important mistakes as you go.', newWords: 1, rules: 'Keep the conversation going; the app shows your corrections right after each learner message.' },
@@ -70,6 +70,8 @@ export interface TutorContext {
   grammar: string[];
   weak: string[];
   goal: string;
+  /** 1–5: how much of the conversation should be Chinese (Settings). */
+  immersion?: number;
 }
 
 /** What the tutor is allowed to know about the learner: taught words, grammar, weak spots. */
@@ -84,8 +86,17 @@ export function tutorContext(s: LearnerState, now = new Date()): TutorContext {
     grammar: grammar.filter((g) => isIntroduced(s, g.id)).map((g) => `${g.title} (${g.pattern})`),
     weak: [...patterns, ...weakWords.slice(0, 8).map((w) => `remembering ${w}`)],
     goal: `Unit ${unit}`,
+    immersion: s.profile.immersion,
   };
 }
+
+/** Levels 1–2 change only what the app shows; from 3 the tutor itself uses less English. */
+const IMMERSION_RULES = [
+  '', '', '',
+  'Explain things in simple Chinese; use English only if they are clearly stuck.',
+  'Use Chinese only, even for explanations, unless they write to you in English.',
+  'Use Chinese only, always. If they write English, answer in simple Chinese.',
+];
 
 export function systemPrompt(ctx: TutorContext, mode: TutorMode, scenario: string): string {
   const m = MODES[mode];
@@ -96,6 +107,7 @@ export function systemPrompt(ctx: TutorContext, mode: TutorMode, scenario: strin
     `Grammar they know: ${ctx.grammar.join('; ') || 'very basic sentences'}.`,
     ctx.weak.length ? `They are working on: ${ctx.weak.join('; ')}. Create natural chances to practise these.` : '',
     `Mode: ${m.label}. ${m.rules}`,
+    IMMERSION_RULES[ctx.immersion ?? 1],
     `Scenario: ${scenario}`,
     'Each reply: 1–3 short sentences in Simplified Chinese (Mainland usage), usually ending with a question so they must answer. No pinyin in "reply"; the app adds it.',
     'In "corrections", list only mistakes in their LAST message that matter: changed meaning, unnatural phrasing, repeated mistakes, important grammar. Skip trivia. "said" is their words, "better" the natural version, "why" one short English sentence. severity 3 = blocks understanding, 1 = minor.',
@@ -367,3 +379,10 @@ export async function generateStory(s: LearnerState, topic: string, signal?: Abo
   const g = { kind: 'story' as const, createdAt: Date.now(), provider: s.profile.ai.provider, topic, payload: story, validation: { ...report, attempts } };
   return aiStory(story, { ...g, id: await db.generated.add(g) });
 }
+
+// ───────────── Missions ─────────────
+/** Which checks the learner's messages meet: plain substring matches on the device, no AI judgement. */
+export const missionChecks = (m: Mission, said: string[]) => m.checks.map((c) => said.some((t) => c.any.some((x) => t.includes(x))));
+
+export const missionSetup = (m: Mission, scenario: string) =>
+  `${scenario} The learner's mission: ${m.brief} Give them natural chances to do it, but never do it for them.`;

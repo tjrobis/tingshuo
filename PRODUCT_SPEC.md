@@ -66,9 +66,9 @@ placeholder; limited features say so in the UI.
 | Benchmarks | Fixed-form periodic assessments with history comparisons and sample sizes | ✅ |
 | Meta-learning | Randomised micro-experiments (intro modality, new-item batch size) + analyses with sample-size gates; adjusts policy | ✅ (needs weeks of data before conclusions appear) |
 | Motivation | Streak, daily/weekly goal, capability-based achievements, no XP | ✅ |
-| Missions | Real-world challenges with evaluation | ✅ |
+| Missions | Real-world challenges: practised with the AI tutor (checked on the device as you type) or done for real and self-reported | ✅ |
 | NL commands | Deterministic intent parser + optional AI fallback → persistent preferences | ✅ |
-| Immersion | 5-level slider affecting UI language, tutor language ratio, English scaffolding | ✅ |
+| Immersion | 5-level slider: tutor language ratio, translations hidden by default, main button labels in Chinese | 🟡 (only the most common button labels are translated) |
 | Data | JSON backup/restore, CSV, Anki-compatible TSV export/import | ✅ |
 | Offline | PWA; reviews, lessons, dictionary, progress offline | ✅ (TTS voice availability depends on device) |
 | Debug | Hidden dashboard: learner model, SRS table, planner decisions, AI log, validation report | ✅ |

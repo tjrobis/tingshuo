@@ -1,13 +1,16 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
+import { t } from '../lib/commands';
 import { units, words } from '../lib/curriculum';
 import { db } from '../lib/db';
 import { errorPatterns } from '../lib/grade';
 import { abilityBand, expectedKnown, masteryStatus, streak, trueRetention, weeklyVelocity } from '../lib/learner';
 import { planSession } from '../lib/planner';
+import { achievements, benchmarkDue, metaLearning } from '../lib/progress';
 import { facetsOf, isIntroduced, ITEMS, nextStory, planInput, storyCoverage, type LearnerState } from '../lib/session';
 import { micSupported, primeAudio } from '../lib/audio';
-import { SKILLS, type MasteryStatus } from '../lib/types';
+import { SKILLS, type MasteryStatus, type UserProfile } from '../lib/types';
+import { CommandBox } from './Command';
 import { Bar, Button, Card, Label, Screen } from './ui';
 
 const SKILL_NAMES: Record<string, string> = {
@@ -16,14 +19,18 @@ const SKILL_NAMES: Record<string, string> = {
 };
 /** Rounded on purpose: these are estimates, not counts. */
 const approx = (n: number) => (n < 20 ? Math.round(n) : Math.round(n / 5) * 5);
+/** On an iPhone/iPad but not opened from the home screen. */
+const inIosSafari = () =>
+  /iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator as { standalone?: boolean }).standalone && !matchMedia('(display-mode: standalone)').matches;
 
-export function Home({ state, audio, onLearn, onOpen }: {
-  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void; onOpen: (screen: 'pronunciation' | 'settings' | 'tutor' | 'reader', story?: string) => void;
+export function Home({ state, audio, onLearn, onOpen, onProfile }: {
+  state: LearnerState; audio: boolean; onLearn: (minutes: number) => void;
+  onOpen: (screen: 'pronunciation' | 'settings' | 'tutor' | 'reader' | 'progress', story?: string) => void; onProfile: (patch: Partial<UserProfile>) => void;
 }) {
   const [minutes, setMinutes] = useState(state.profile.sessionMinutes);
   const [why, setWhy] = useState(false);
   const now = new Date();
-  const input = planInput(state, minutes, now, audio);
+  const input = planInput(state, minutes, now, audio, metaLearning(state, +now).policy);
   const plan = planSession(input);
   const all = [...state.srs.values()];
 
@@ -32,6 +39,9 @@ export function Home({ state, audio, onLearn, onOpen }: {
   const days = streak(finished.filter((s) => s.stats.minutes >= 1).map((s) => s.startedAt), +now);
   const retention = trueRetention(state.reviews, +now);
   const talked = (useLiveQuery(() => db.conversations.where('startedAt').above(+now - 7 * 86_400_000).toArray(), []) ?? []).reduce((m, c) => m + c.minutes, 0);
+  const fresh = useLiveQuery(() => db.achievements.where('unlockedAt').above(Date.now() - 3 * 86_400_000).toArray(), []) ?? [];
+  const history = useLiveQuery(() => db.assessments.toArray(), []);
+  const titles = new Map(achievements(state, now, []).map((a) => [a.id, a.title]));
 
   const statuses = new Map<string, MasteryStatus>(
     [...state.mastery.keys()].filter((id) => ITEMS.has(id)).map((id) => [id, masteryStatus(ITEMS.get(id)!.kind, facetsOf(state, id), now)]),
@@ -73,13 +83,20 @@ export function Home({ state, audio, onLearn, onOpen }: {
         </div>
       </header>
 
+      {inIosSafari() && (
+        <Card className="text-sm ring-amber-300 dark:ring-amber-800">
+          <b>Install it on your iPhone:</b> tap Share, then <b>Add to Home Screen</b>. It then opens full screen, works offline,
+          and keeps your progress safe: Safari can clear data for websites you haven't opened in a while.
+        </Card>
+      )}
+
       <Card className="flex flex-col gap-4 bg-gradient-to-br from-indigo-600 to-teal-600 text-white ring-0">
         <div>
           <div className="text-sm text-indigo-100">Today's priority</div>
           <p className="text-lg leading-snug">{plan.priority}</p>
         </div>
-        <Button onClick={() => { primeAudio(); onLearn(minutes); }} className="bg-white py-4 text-xl font-semibold text-indigo-700 hover:bg-indigo-50">
-          Learn now
+        <Button variant="inverse" onClick={() => { primeAudio(); onLearn(minutes); }} className="py-4 text-xl font-semibold">
+          {t('Learn now')}
         </Button>
         <div className="flex flex-wrap items-center gap-2">
           {[5, 10, 20, 30, 45].map((m) => (
@@ -98,11 +115,16 @@ export function Home({ state, audio, onLearn, onOpen }: {
         )}
       </Card>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Button variant="secondary" onClick={() => onOpen('tutor')}>Talk</Button>
-        <Button variant="secondary" onClick={() => onOpen('reader')}>Read</Button>
-        <Button variant="secondary" onClick={() => onOpen('pronunciation')}>Tones</Button>
+      <div className="grid grid-cols-4 gap-2">
+        {([['tutor', 'Talk'], ['reader', 'Read'], ['pronunciation', 'Tones'], ['progress', 'Progress']] as const).map(([screen, name]) => (
+          <Button key={screen} variant="secondary" className="px-1 text-sm" onClick={() => onOpen(screen)}>{t(name)}</Button>
+        ))}
       </div>
+
+      <CommandBox profile={state.profile} onPatch={(patch) => {
+        onProfile(patch);
+        if (patch.sessionMinutes) setMinutes(patch.sessionMinutes);
+      }} />
 
       {story && (
         <Card className="flex items-center gap-3">
@@ -154,6 +176,11 @@ export function Home({ state, audio, onLearn, onOpen }: {
         </div>
         <div className="flex justify-between text-sm"><span>Learned this week and holding</span><span className="text-slate-500">{velocity}</span></div>
         <div className="flex justify-between text-sm"><span>Conversation this week</span><span className="text-slate-500">{Math.round(talked)} min</span></div>
+        {fresh.map((a) => <div key={a.id} className="text-sm">🏅 <b>New:</b> {titles.get(a.id) ?? a.id}</div>)}
+        {history && benchmarkDue(state, history, +now) && (
+          <button type="button" onClick={() => onOpen('progress')} className="text-left text-sm text-indigo-700 underline dark:text-indigo-300">A benchmark is due: see how far you've come (5 min)</button>
+        )}
+        <button type="button" onClick={() => onOpen('progress')} className="text-left text-sm text-slate-500 underline">Knowledge map, benchmarks and achievements</button>
       </Card>
 
       {skills.length > 0 && (

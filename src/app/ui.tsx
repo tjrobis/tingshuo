@@ -2,14 +2,16 @@
 import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from 'react';
 import { speak } from '../lib/audio';
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'good' | 'bad' };
+type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'ghost' | 'good' | 'bad' | 'inverse' };
 const VARIANTS = {
   primary: 'bg-indigo-600 text-white hover:bg-indigo-500 active:bg-indigo-700',
   secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
   ghost: 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
   good: 'bg-emerald-600 text-white hover:bg-emerald-500',
   bad: 'bg-rose-600 text-white hover:bg-rose-500',
+  inverse: 'bg-white text-indigo-700 hover:bg-indigo-50', // on coloured cards
 };
+// Colours come only from the variant: an extra colour class in className loses to whichever utility CSS lists last.
 
 export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
   return (

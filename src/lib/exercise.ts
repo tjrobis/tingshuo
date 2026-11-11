@@ -69,8 +69,11 @@ export interface MakeOptions {
   mic: boolean;
   scaffold: number;
   rng?: () => number;
-  /** Force a format (tests, placement). */
+  /** Force a format (tests, benchmarks): the slot's facet is then used even if it isn't active. */
   format?: string;
+  /** Meta-learning policy: chance of an audio-first introduction, per-format difficulty calibration. */
+  audioFirst?: number;
+  kScale?: Record<string, number>;
 }
 
 const AUDIO_FORMATS = new Set(['audio_to_meaning_mc', 'audio_to_meaning_typed', 'dictation', 'minimal_pair', 'tone_id']);
@@ -184,7 +187,7 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
         emoji: w.emoji, highlight: w.hanzi, zh: surface(first.zh), context: first.id,
         help: { why: whyWord(w), breakdown: breakdown(first.zh), notes: [w.note, ...grammarNotes(first)].filter((n): n is string => !!n) },
       });
-      ex.intro!.audioFirst = opts.audio && rng() < 0.5; // randomised for meta-learning (LEARNING_ENGINE §11)
+      ex.intro!.audioFirst = opts.audio && rng() < (opts.audioFirst ?? 0.5); // randomised for meta-learning (LEARNING_ENGINE §11)
       return ex;
     }
     if (kind === 'grammar') {
@@ -215,7 +218,7 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
 
   // ── Tests ──
   const isActive = (f?: Facet) => !!f && (f === 'produce' ? opts.mic : active.some((x) => x.facet === f)); // speaking needs the mic, now
-  const facet = isActive(slot.facet) ? slot.facet! : isActive(PRIMARY[kind]) ? PRIMARY[kind] : undefined;
+  const facet = opts.format && slot.facet ? slot.facet : isActive(slot.facet) ? slot.facet! : isActive(PRIMARY[kind]) ? PRIMARY[kind] : undefined;
   if (!facet) return null;
   const card = active.find((x) => x.facet === facet)?.card ?? createEmptyCard<Card>(opts.now);
   const w = kind === 'word' ? wordById.get(item.id)! : undefined;
@@ -224,7 +227,7 @@ export function makeExercise(s: LearnerState, slot: Slot, opts: MakeOptions): Ex
   // Right after any review FSRS predicts ~100 % recall, even after a miss. While a facet is still being
   // learned (never succeeded, or just failed), use the most supportive format instead.
   const learning = card.stability < 1 || s.mastery.get(item.id)?.byFacet[facet]?.lastResult === false;
-  const format = opts.format ?? chooseFormat(facet, learning ? 0 : retrievability(card, opts.now), opts.scaffold, {}, allowed);
+  const format = opts.format ?? chooseFormat(facet, learning ? 0 : retrievability(card, opts.now), opts.scaffold, opts.kScale, allowed);
   if (AUDIO_FORMATS.has(format) && !opts.audio) return null;
   const t = { ...base, facet, format, voice: facet === 'listening' ? Math.floor(rng() * 4) : undefined };
 

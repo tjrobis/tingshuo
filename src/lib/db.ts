@@ -4,7 +4,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { LearnerState } from './session';
 import type {
-  AILogEntry, AssessmentRecord, AudioAsset, ConversationMessage, ConversationRecord, ErrorRecord, GeneratedContent, PronunciationAttempt, SecretRecord, LearningEvent, LessonRecord, MasteryState, ReviewRecord, SkillAbility, SRSState, UserProfile,
+  AchievementRecord, AILogEntry, AssessmentRecord, AudioAsset, ConversationMessage, ConversationRecord, ErrorRecord, GeneratedContent, PronunciationAttempt, SecretRecord, LearningEvent, LessonRecord, MasteryState, ReviewRecord, SkillAbility, SRSState, UserProfile,
 } from './types';
 
 export const db = new Dexie('tingshuo') as Dexie & {
@@ -24,6 +24,7 @@ export const db = new Dexie('tingshuo') as Dexie & {
   messages: EntityTable<ConversationMessage, 'id'>;
   aiLog: EntityTable<AILogEntry, 'id'>;
   generated: EntityTable<GeneratedContent, 'id'>;
+  achievements: EntityTable<AchievementRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -42,6 +43,8 @@ db.version(2).stores({ pronunciation: '++id, at, itemId', recordings: '++id, at'
 db.version(3).stores({ secrets: 'provider', conversations: '++id, startedAt', messages: '++id, conversationId', aiLog: '++id, at' });
 // v4: AI-written stories with their validation report (never merged into the curriculum).
 db.version(4).stores({ generated: '++id, kind, createdAt' });
+// v5: when each capability achievement was first met (the achievements themselves are derived).
+db.version(5).stores({ achievements: 'id, unlockedAt' });
 
 /** Everything one learning step changes, written atomically so the model can't half-update. */
 export interface Writes {

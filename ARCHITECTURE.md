@@ -6,6 +6,9 @@
 
 **Chosen:** React 19 + TypeScript (strict) + Vite, installed as a Progressive Web App.
 
+**Target device:** the learner's iPhone 16 Pro Max (iOS 26), installed to the Home Screen. Layouts are
+checked at its 440×956 CSS-px viewport; desktop is a convenience.
+
 | Option | Verdict |
 |--------|---------|
 | **PWA (chosen)** | One codebase for iPhone + desktop, $0 hosting (any static host), offline via service worker, mic via `getUserMedia`, TTS via `speechSynthesis`, storage via IndexedDB. Fast iteration. |
@@ -18,8 +21,12 @@
 | Constraint | Mitigation |
 |------------|------------|
 | Web Speech **recognition** is unavailable in home-screen (standalone) web apps ([WebKit bug 225298](https://bugs.webkit.org/show_bug.cgi?id=225298)) | Pronunciation/tone feedback runs on **local pitch analysis**, which works everywhere. STT is an optional enhancer (works in a Safari tab; or via an optional AI provider). The iOS keyboard's dictation mic also works in any text field. |
-| Safari may evict script storage for sites not used for 7 days unless installed to the Home Screen | Install prompt + `navigator.storage.persist()` + one-tap JSON backup + backup reminder. |
+| Safari may evict script storage for sites not used for 7 days unless installed to the Home Screen | In a Safari tab on iOS, Home says how to install and why; `navigator.storage.persist()`; JSON backup (slice 9). There is no `beforeinstallprompt` on iOS: installing is Share → Add to Home Screen. |
 | `speechSynthesis` needs a user gesture on iOS before first use | Audio is always triggered from taps; voices are primed on first tap. |
+| `black-translucent` status bar is deprecated and draws white text over a light page | `default` status bar (follows light/dark) with a `theme-color` per scheme. Needs checking on the device. |
+| iOS lists novelty "Eloquence" Chinese voices (Grandpa, Rocko…) whose tones are too rough to learn from | Filtered out; Premium/Enhanced voices preferred. |
+| Inputs under 16 px make Safari zoom; autocorrect/capitalisation mangle typed pinyin | Every answer field is ≥ 16 px with autocorrect, capitals and spellcheck off. |
+| Home indicator overlaps content at the bottom edge | Bottom padding uses `env(safe-area-inset-bottom)`, including the tutor's sticky input bar. |
 | Microphone requires a secure context (HTTPS) | Deploy to any HTTPS static host; for LAN testing `npm run dev:https` uses a self-signed cert. |
 
 ## 2. High-level structure
@@ -73,7 +80,8 @@ src/
   app/           App (screen switch, no router), Onboarding, Placement, Home (dashboard), Session,
                  Pronunciation (tone-pair grid trainer), Settings (incl. AI provider), Recorder (recording,
                  contour plot, review), Tutor (AI conversation, review, offline roleplay), Reader (story list,
-                 story view, tappable text with a word sheet; also used by sessions and the tutor)
+                 story view, tappable text with a word sheet; also used by sessions and the tutor), Progress
+                 (achievements, benchmarks, insights, knowledge map), Command ("tell the app…" box)
                  (runner + summary), Exercise (renders every format + help panels), ui (primitives)
   data/curriculum.ts                   curated curriculum as pipe tables (read-only, validated)
   lib/
@@ -94,7 +102,11 @@ src/
     pitch.ts       YIN pitch tracking, per-syllable tone diagnosis + feedback, rhythm, voice-range learning
     ai.ts          provider adapters (Anthropic SDK lazy-loaded, OpenAI/compatible, Gemini) + error mapping
     tutor.ts       AI features: tutor prompts, reply parsing/validation, local pinyin, corrections → errors,
-                   graded AI stories (brief, parse, coverage check, one rewrite), request log
+                   graded AI stories (brief, parse, coverage check, one rewrite), mission checks, request log
+    progress.ts    derived analytics: meta-learning experiments + planner policy, achievements, fixed-form
+                   benchmarks (seeded, comparable over time)
+    commands.ts    natural-language commands → profile changes (rules first, AI only picks among them),
+                   immersion levels and the button-label translation they drive
 ```
 
 Grows only when a slice needs it; this block is updated as files land.

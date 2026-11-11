@@ -10,7 +10,7 @@ export interface ChatMessage {
 }
 
 export interface ChatRequest {
-  purpose: 'tutor' | 'review' | 'explain' | 'story' | 'test';
+  purpose: 'tutor' | 'review' | 'explain' | 'story' | 'command' | 'test';
   system: string;
   messages: ChatMessage[];
   /** JSON schema the reply must follow (enforced where the provider supports it, requested otherwise). */

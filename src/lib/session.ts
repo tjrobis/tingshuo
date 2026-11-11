@@ -91,6 +91,9 @@ const newFacet = (itemId: string, facet: Facet, now: Date): SRSState => ({
 /** Production drills need a microphone the learner has switched on. */
 const usable = (s: LearnerState) => (f: Facet) => f !== 'produce' || !!s.profile.micAvailable;
 
+/** Apply a profile change to the in-memory state (the caller persists it). */
+export const commitProfile = (s: LearnerState, patch: Partial<UserProfile>) => Object.assign(s.profile, patch);
+
 /** Apply persisted writes to the in-memory state. */
 export function commit(s: LearnerState, w: Writes): void {
   w.srs?.forEach((x) => s.srs.set(x.id, x));
@@ -186,12 +189,19 @@ export function applyLookup(s: LearnerState, itemId: string, now: Date, context?
 }
 
 // ───────────── Planning input ─────────────
-export function planInput(s: LearnerState, minutes: number, now: Date, audio = true): PlanInput {
+/** Correct answers in targeted drills (they resolve error patterns). */
+export const drillWins = (s: LearnerState) => s.answers.filter((e) => e.correct && typeof e.meta?.drill === 'string').map((e) => ({ key: e.meta!.drill as string, at: e.at }));
+
+/** −1, 0 or +1 new words, varying by day: the batch-size experiment (LEARNING_ENGINE §11). */
+export const exploreOffset = (now: number) => (((Math.floor(now / DAY) * 2654435761) >>> 0) % 3) - 1;
+
+/** `policy` comes from meta-learning (progress.ts); without it the defaults apply. */
+export function planInput(s: LearnerState, minutes: number, now: Date, audio = true, policy?: { newItemCap: number }): PlanInput {
   const t = +now;
   const due = [...s.srs.values()].filter((x) => x.card.state !== State.New && +x.card.due <= t && !isPronunciation(x.itemId));
   const recent = s.reviews.filter((r) => r.elapsed_days >= 1 && (s.mastery.get(r.itemId)?.introducedAt ?? 0) >= t - 4 * DAY);
   const perceive = s.answers.filter((e) => e.facet === 'perceive').slice(-30);
-  const wins = s.answers.filter((e) => e.correct && typeof e.meta?.drill === 'string').map((e) => ({ key: e.meta!.drill as string, at: e.at }));
+  const wins = drillWins(s);
   const recurring = errorPatterns(s.errors, wins, t).filter((p) => p.status === 'recurring');
   return {
     minutes,
@@ -208,7 +218,9 @@ export function planInput(s: LearnerState, minutes: number, now: Date, audio = t
     recurringPatterns: recurring.length,
     toneConfusion: recurring.some((p) => p.key.startsWith('tone:')),
     focus: s.profile.focus,
-    newItemCap: 8,
+    newItemCap: policy?.newItemCap ?? s.profile.newItemCap ?? 8,
+    // Experiment only once the first week is settled.
+    explore: (t - s.profile.createdAt) / DAY >= 7 ? exploreOffset(t) : 0,
     newAvailable: newCandidates(s).length,
   };
 }
@@ -226,9 +238,9 @@ export interface Slot {
   intro?: boolean;
   /** Error-pattern key when this slot is a targeted drill. */
   drill?: string;
-  /** Practice that isn't a spaced-repetition review: shadowing a sentence, a listening dialogue, a story. */
-  practice?: 'shadow' | 'dialogue' | 'story';
-  /** Sentence, dialogue or story id for practice slots. */
+  /** Practice that isn't a spaced-repetition review: shadowing a sentence, a listening dialogue, a story, a mission. */
+  practice?: 'shadow' | 'dialogue' | 'story' | 'mission';
+  /** Sentence, dialogue, story or mission id for practice slots. */
   ref?: string;
 }
 
@@ -307,7 +319,7 @@ export function buildQueue(s: LearnerState, plan: SessionPlan, now: Date, opts: 
   }
 
   // Targeted drills for mistakes that keep coming back.
-  const wins = s.answers.filter((e) => e.correct && typeof e.meta?.drill === 'string').map((e) => ({ key: e.meta!.drill as string, at: e.at }));
+  const wins = drillWins(s);
   const drills = errorPatterns(s.errors, wins, +now)
     .filter((p) => p.status === 'recurring')
     .flatMap((p) => p.itemIds.filter((id) => ITEMS.has(id) && isIntroduced(s, id)).map((id) => slot(id, id.startsWith('w:') ? 'recall' : PRIMARY[ITEMS.get(id)!.kind], { drill: p.key })))
@@ -412,7 +424,7 @@ export interface Practice {
 
 /** Shadowing, dialogues and stories aren't reviews: they move the speaking/listening/reading ability, not FSRS. */
 export function applyPractice(s: LearnerState, p: Practice, now: Date): Writes {
-  const skill: Skill = p.slot.practice === 'dialogue' ? 'listening' : p.slot.practice === 'story' ? 'reading' : 'speaking';
+  const skill: Skill = p.slot.practice === 'dialogue' ? 'listening' : p.slot.practice === 'story' ? 'reading' : 'speaking'; // shadowing, missions
   return {
     abilities: [updateAbility(s.abilities.get(skill) ?? { skill, theta: 0, n: 0, updatedAt: 0 }, p.level, p.correct, +now)],
     events: [{

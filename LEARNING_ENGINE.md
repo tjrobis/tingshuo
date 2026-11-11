@@ -181,7 +181,9 @@ memory alone). `k` per format is **re-calibrated per learner** from predicted-vs
    - speaking: 0.15 if a mic is available, +0.10 if θ_speaking lags.
    - input (story/dialogue): 0.10 once ≥ 30 words known and a text with ≥ 90 % coverage exists.
    - error drills: 0.10 if open recurring patterns exist.
-   - learner focus requests ("more listening", topic boosts) multiply relevant weights by 1.5 for 7 days.
+   - learner focus requests ("more listening", "more tones"…) multiply the block's weight by 1.5 for 7 days.
+   - after the first week, the new-item count varies by −1/0/+1 by day (batch-size experiment, §11), never
+     past the cap and never when the retention gate says none.
 5. **Queue construction:** warm-up (2–3 tone items) → interleaved review + new (each new item:
    intro → immediate retrieval → re-test after 2–4 other exercises → end-of-session retest) →
    listening → speaking → input → error drills → closing retrieval of today's new items.
@@ -202,7 +204,7 @@ memory alone). `k` per format is **re-calibrated per learner** from predicted-vs
 - If no other block can use the time (no audio, no mic, no stories yet), new items may take it, still
   within the cap and the retention gate.
 - *(Planned)* a different representation (contrast, mnemonic) for an item failed twice.
-- "Too easy" / "too hard" commands shift the scaffold level persistently by ±1.
+- "Too easy" / "too hard" commands shift the scaffold level persistently by ±1 (and at once, mid-session).
 
 ## 8. Error model ("error bank")
 
@@ -291,18 +293,19 @@ AI-generated content:
 
 ## 11. Meta-learning
 
-Runs after each session on the event log. Each analysis has a minimum sample size and reports
-effect size with a Bayesian probability (Beta posteriors, normal approximation). Insights are shown
-only when n ≥ threshold **and** P(effect) ≥ 0.9.
+Derived from the history on read (`progress.ts`), never stored, so it is always current. An insight
+needs ≥ 15 observations per arm and P(effect) ≥ 0.9 (Beta(1,1) posteriors, normal approximation);
+until then the experiment is listed as "still collecting data" with its count. "First review" means
+a word's first review on a later day than its introduction (lookups excluded).
 
-| Analysis | Data | Policy adjusted |
-|----------|------|-----------------|
-| Intro modality (audio-first vs text-first, **randomised** 50/50 while exploring) | first-review success of items by intro arm | `introModality` preference (keeps 10 % exploration) |
-| New-item batch size (randomised within ±2 of current cap) | next-day retention by batch bucket | `newItemCap` |
-| Tone perception vs production gap | accuracy by facet | tone block weights |
-| Format calibration | predicted P vs actual per format | `k_format` per learner |
-| Time of day | retention by session hour bucket | suggestion only |
-| Retention vs target | true retention over 30 days | suggests desired retention change |
+| Analysis | Data | Effect |
+|----------|------|--------|
+| Intro modality (audio-first vs text-first, **randomised** 50/50) | first-review success by arm | intro odds become 90/10 for the winner (10 % keep testing) |
+| New words per session (varied ±1 by day after week one) | first-review success, sessions at or below the median batch vs above | cap = the median batch when smaller batches win (unless the learner set their own) |
+| Tone hearing vs saying | last 60 perceive vs produce answers | advice |
+| Format calibration | spaced reviews (≥ 1 day) per format: predicted R^k vs actual, n ≥ 30 | per-format k multiplier, used by format choice |
+| Time of day | first-review success by the hour words were introduced | advice |
+| Retention vs target | spaced reviews, last 30 days, n ≥ 50 | advice (the memory target is a setting) |
 
 ## 12. Progress and honesty rules
 
@@ -310,6 +313,14 @@ only when n ≥ threshold **and** P(effect) ≥ 0.9.
   rounded to a range; "words you can produce" = Σ R(recall).
 - Characters recognised ≈ Σ R(char).
 - Retention = success rate of reviews with elapsed ≥ 1 day, last 30 days, with n shown.
-- Benchmarks use fixed item banks per level so results are comparable over time; comparisons always
-  show the sample size ("18/25 sentences").
+- Benchmarks are fixed forms (A: units 1–4, B: 1–8, C: 1–12): items picked by a stable hash, exercises
+  built from a blank learner state with a seeded shuffle, pinyin hidden, help counting as a miss, no
+  effect on reviews. Results are per skill with n ("5/8"), compared only with the same form and skill.
+  Suggested every 14 days once 15 items are introduced.
+- Achievements are capabilities (a unit's goal holding, M1, words recognised/said by the memory
+  model, stories understood, conversation, missions, a recurring mistake fixed), never points;
+  each records the date it was first met.
+- Missions are checked on the device: a check passes when the learner wrote one of its listed
+  phrases (tested to be reachable with words taught by the mission's unit). Done for real, they are
+  self-reported and labelled so.
 - No percentage is shown when n < 10; we show "not enough data yet".

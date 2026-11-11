@@ -4,7 +4,8 @@ import { db } from './db';
 import { charOverlap } from './grade';
 import { commit, emptyState, newProfile, seedKnown } from './session';
 import { words } from './curriculum';
-import { ask, correctionsToErrors, generateStory, MODES, parseReply, parseStory, REPLY_SCHEMA, storyBrief, storyRequest, systemPrompt, unknownWords } from './tutor';
+import { missions } from './curriculum';
+import { ask, correctionsToErrors, generateStory, missionChecks, MODES, parseReply, parseStory, REPLY_SCHEMA, storyBrief, storyRequest, systemPrompt, unknownWords } from './tutor';
 
 // ── A stand-in for the Anthropic SDK that records what it was asked ──
 const sdk = vi.hoisted(() => {
@@ -129,6 +130,18 @@ describe('tutor', () => {
     expect(p).toMatch(/At a café\./);
     expect(p).toMatch(/JSON only/);
     expect(MODES.learning.newWords).toBe(1);
+  });
+
+  it('uses less English as immersion rises', () => {
+    const ctx = { name: 'Sam', known: ['你好'], grammar: [], weak: [], goal: 'Unit 1' };
+    expect(systemPrompt({ ...ctx, immersion: 1 }, 'conversation', 'x')).not.toMatch(/Chinese only/);
+    expect(systemPrompt({ ...ctx, immersion: 5 }, 'conversation', 'x')).toMatch(/Use Chinese only, always/);
+  });
+
+  it('checks missions against what the learner wrote, on the device', () => {
+    const order = missions.find((m) => m.id === 'order')!;
+    expect(missionChecks(order, ['我要一碗面', '谢谢'])).toEqual([true, true, false]);
+    expect(missionChecks(order, ['我要一碗面', '服务员，买单！'])).toEqual([true, true, true]);
   });
 
   it('parses replies defensively', () => {

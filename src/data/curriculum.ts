@@ -920,3 +920,18 @@ export const STORIES = `
 ?|Why do they take the subway?|It's cheaper|It's faster|There are no taxis
 ?|Where is the hotel?|On the left, close by|On the right|Next to the airport
 `;
+
+// Real-world missions, unlocked by unit. Checks are matched against what the learner writes:
+// `label=a/b/c` passes when any of a, b, c appears. Optional last column: minimum minutes.
+// id | unit | title | tutor scenario | brief | checks (;) | minutes
+export const MISSIONS = `
+intro|2|Introduce yourself|meet|Meet someone new: say hello, tell them your name and where you're from, and ask about them.|Say hello=你好/您好;Say your name=我叫/我是;Say where you're from=国人/中国/美国;Ask about them=你呢/你叫什么
+repair|3|Keep the conversation going|friends|Your friend talks a bit fast. Ask them to slow down or say it again, and ask what a word means.|Ask them to slow down or repeat=慢/再说/一遍;Say you don't understand=不懂;Ask what something means=什么意思
+hobbies|5|Talk about what you like|hobbies|Find out what your new friend likes doing, and tell them about your own hobbies.|Say what you like=我喜欢/我爱/我非常喜欢;Ask what they like=你喜欢/什么爱好;Say what you don't like=不喜欢/不太喜欢
+family|6|Talk about your family|friends|Tell a friend about your family or pets, and ask about theirs.|Say who's in your family=爸爸/妈妈/哥哥/姐姐/弟弟/妹妹/口人;Use a measure word=个/只;Ask about theirs=你家/你有
+order|7|Order food and drinks|restaurant|You're in a noodle restaurant. Order something to eat and drink, then get the bill.|Say what you want=我要/我想;Use a measure word=碗/杯/个;Ask for the bill=买单
+bargain|8|Buy something and bargain|shopping|You're at a market stall. Ask the price of something and get it a bit cheaper.|Ask the price=多少钱/几块;Say it's too expensive=太贵;Ask for a lower price=便宜
+plans|11|Make plans with a friend|friends|Arrange to do something together this weekend: agree what, when and where.|Suggest doing something together=一起/我们去/吧;Say when=星期/周末/明天/点;Agree=好/可以/没问题
+m1|11|Your first 5-minute conversation|meet|Talk for five minutes: introduce yourself, talk about what you like and your plans, and keep going when you don't understand.|Introduce yourself=我叫/我是;Talk about what you like=喜欢/爱;Talk about plans=打算/周末/明天;Keep it going=你呢/什么意思/再说|5
+directions|12|Find your way|directions|You're lost. Ask how to get somewhere and check you understood the answer.|Ask where something is=在哪儿/在哪里/怎么走;Repeat the direction=左/右/往;Say thanks=谢谢
+`;

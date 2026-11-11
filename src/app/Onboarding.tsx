@@ -1,15 +1,11 @@
 import { useState } from 'react';
+import { TOPICS as INTERESTS } from '../lib/commands';
 import { db } from '../lib/db';
 import { emptyState, newProfile, type LearnerState } from '../lib/session';
 import type { PinyinMode } from '../lib/types';
 import { Button, Card, Chip, Label, Screen } from './ui';
 
 // Topic ids match the lexicon's topic tags; interests reorder words within a unit, never the method.
-const INTERESTS: [string, string][] = [
-  ['gaming', 'Gaming'], ['travel', 'Travel'], ['food', 'Food'], ['dating', 'Dating & relationships'], ['people', 'Meeting people'],
-  ['school', 'School'], ['outdoors', 'Outdoors'], ['tech', 'Technology'], ['culture', 'Chinese culture'], ['hobbies', 'Hobbies'],
-  ['family', 'Family'], ['shopping', 'Shopping'],
-];
 const DEFAULT_INTERESTS = ['gaming', 'travel', 'food', 'dating', 'people', 'school', 'outdoors', 'tech', 'culture'];
 const GOALS = ['Hold real conversations', 'Understand native speakers', 'Travel or live in China', 'Make Chinese friends', 'Read Chinese', 'Understand Chinese media'];
 const PINYIN: [PinyinMode, string, string][] = [

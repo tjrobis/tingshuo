@@ -100,4 +100,16 @@ describe('planSession when nothing else can use the time', () => {
     expect(plan({ ...idle, retentionHealth: 0.5 }).newItems).toBe(0);
     expect(plan(idle).priority).toMatch(/8 new item/);
   });
+  it('varies new words by ±1 for the batch-size experiment, never past the cap or when the gate says none', () => {
+    const p = plan({ minutes: 20 });
+    expect(plan({ minutes: 20, explore: 1 }).newItems).toBe(p.newItems + 1);
+    expect(plan({ minutes: 20, explore: -1 }).newItems).toBe(p.newItems - 1);
+    expect(plan({ minutes: 45, dueCount: 0, newItemCap: 8, explore: 1 }).newItems).toBe(8);
+    expect(plan({ retentionHealth: 0.5, explore: 1 }).newItems).toBe(0);
+  });
+
+  it('"more tones" lengthens the warm-up', () => {
+    const later = now + 86_400_000;
+    expect(minutes(plan({ focus: [{ kind: 'skill', key: 'tones', factor: 1.5, until: later }] }), 'warmup')).toBeGreaterThan(minutes(plan({}), 'warmup'));
+  });
 });

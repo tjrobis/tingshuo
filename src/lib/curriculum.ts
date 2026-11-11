@@ -1,10 +1,10 @@
 // Parses the curated tables in src/data/curriculum.ts into typed, indexed content.
 
-import { CHARACTERS, DIALOGUES, GRAMMAR, LEXICON, SENTENCES, SOUND_PAIRS, STORIES, TONE_SETS, UNITS } from '../data/curriculum';
+import { CHARACTERS, DIALOGUES, GRAMMAR, LEXICON, MISSIONS, SENTENCES, SOUND_PAIRS, STORIES, TONE_SETS, UNITS } from '../data/curriculum';
 import type { ChineseTarget } from './grade';
 import { formatWord, parseNumbered, surfaceTones, type Syllable } from './pinyin';
 import { splitTokenised } from './segment';
-import type { CharacterInfo, Dialogue, GrammarConcept, Sentence, Story, Unit, VocabularyItem } from './types';
+import type { CharacterInfo, Dialogue, GrammarConcept, Mission, Sentence, Story, Unit, VocabularyItem } from './types';
 
 /** Pipe-table rows, each tagged with the unit of the latest `# N` header. */
 function rows(table: string): { unit: number; cols: string[] }[] {
@@ -118,6 +118,14 @@ for (const { cols } of rows(STORIES)) {
   else if (tag === '?') st.questions.push({ q: a, options: [b, ...rest], answer: 0 });
   else st.paragraphs[st.paragraphs.length - 1].push({ tokens: splitTokenised(tag), en: a });
 }
+
+export const missions: Mission[] = rows(MISSIONS).map(({ cols: [id, unit, title, scenario, brief, checks, minutes] }) => ({
+  id, unit: Number(unit), title, scenario, brief, minutes: minutes ? Number(minutes) : undefined,
+  checks: checks.split(';').map((c) => {
+    const [label, any] = c.split('=');
+    return { label, any: any.split('/') };
+  }),
+}));
 
 /** Two-syllable words grouped by citation tones ("3-0" → 我们, 姐姐…), for tone-pair drills. */
 export function tonePairWords(): Map<string, VocabularyItem[]> {

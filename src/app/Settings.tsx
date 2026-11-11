@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { PROVIDERS } from '../lib/ai';
 import { chineseVoices, micSupported, speak, startRecording, sttSupported } from '../lib/audio';
+import { IMMERSION_LEVELS } from '../lib/commands';
 import { db } from '../lib/db';
 import { pitchTrack, updateSpeaker } from '../lib/pitch';
 import { ask } from '../lib/tutor';
-import type { AIProviderId, PinyinMode, UserProfile } from '../lib/types';
+import type { AIProviderId, ImmersionLevel, PinyinMode, UserProfile } from '../lib/types';
 import { Button, Card, Chip, Label, Screen } from './ui';
 
 const SPEEDS: [number, string][] = [[0.6, '0.6× learning'], [0.75, '0.75×'], [1, '1× normal'], [1.15, '1.15× fast']];
@@ -76,6 +77,24 @@ export function Settings({ profile, onChange, onBack }: { profile: UserProfile; 
         <div className="flex flex-wrap gap-2">
           {PINYIN.map(([m, l]) => <Chip key={m} active={profile.pinyinMode === m} onClick={() => onChange({ pinyinMode: m })}>{l}</Chip>)}
         </div>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <Label>Immersion · level {profile.immersion} of 5</Label>
+        <input type="range" min={1} max={5} step={1} value={profile.immersion} aria-label="Immersion level" className="accent-indigo-600"
+          onChange={(e) => onChange({ immersion: Number(e.target.value) as ImmersionLevel })} />
+        <p className="text-sm">{IMMERSION_LEVELS[profile.immersion]}</p>
+        <p className="text-sm text-slate-500">New words are always introduced with their meaning; this changes the tutor, translations and buttons.</p>
+      </Card>
+
+      <Card className="flex flex-col gap-3">
+        <Label>Memory target</Label>
+        <div className="flex flex-wrap gap-2">
+          {([[0.85, '85%: fewer reviews'], [0.9, '90% (recommended)'], [0.95, '95%: more reviews']] as const).map(([r, l]) => (
+            <Chip key={r} active={profile.desiredRetention === r} onClick={() => onChange({ desiredRetention: r })}>{l}</Chip>
+          ))}
+        </div>
+        <p className="text-sm text-slate-500">How likely you should be to remember a word when it comes back. Higher means more reviews, closer together.</p>
       </Card>
 
       <Card className="flex flex-col gap-3">

@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { configureSpeech } from '../lib/audio';
+import { setImmersion, t, type Command } from '../lib/commands';
 import { db, persist, savePronunciation } from '../lib/db';
 import { expectedOf, gradeExercise, makeExercise, type Exercise, type Response } from '../lib/exercise';
 import type { GradeResult, Verdict } from '../lib/grade';
 import { toAttempt, updateSpeaker } from '../lib/pitch';
 import { adaptScaffold, planSession } from '../lib/planner';
-import { applyAnswer, applyPractice, buildQueue, commit, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
+import { metaLearning } from '../lib/progress';
+import { applyAnswer, applyPractice, buildQueue, commit, commitProfile, introduce, planInput, type LearnerState, type Slot } from '../lib/session';
 import { State } from '../lib/srs';
 import { aiReady, ask, explainRequest, tutorContext } from '../lib/tutor';
 import { stories } from '../lib/curriculum';
+import type { UserProfile } from '../lib/types';
+import { CommandBox } from './Command';
 import { ExerciseView } from './Exercise';
 import { StoryView, type StoryResult } from './Reader';
 import type { Spoken } from './Recorder';
@@ -23,7 +28,9 @@ const insert = (q: Slot[], at: number, s: Slot) => [...q.slice(0, at), s, ...q.s
 const describe = (r: Response, ex: Exercise) => ('choice' in r ? ex.choices![r.choice].label : 'order' in r ? r.order.join('') : 'speech' in r ? `(spoken${r.self ? `, self: ${r.self}` : ''})` : r.text);
 
 export function Session({ state, minutes, audio, onExit }: { state: LearnerState; minutes: number; audio: boolean; onExit: () => void }) {
-  const [plan] = useState(() => planSession(planInput(state, minutes, new Date(), audio)));
+  // Meta-learning policy (§11): audio-first odds, new-word cap, per-format calibration. Fixed for the session.
+  const [policy] = useState(() => metaLearning(state, +new Date()).policy);
+  const [plan] = useState(() => planSession(planInput(state, minutes, new Date(), audio, policy)));
   const [queue, setQueue] = useState<Slot[]>(() => buildQueue(state, plan, new Date(), { audio }));
   const [index, setIndex] = useState(0);
   const [result, setResult] = useState<GradeResult>();
@@ -59,11 +66,11 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
   // The next slot that yields an exercise (slots can become moot, e.g. a facet not unlocked).
   const current = useMemo(() => {
     for (let i = index; i < queue.length; i++) {
-      const ex = makeExercise(state, queue[i], { now: new Date(), audio, mic: !!state.profile.micAvailable, scaffold: scaffold.current });
+      const ex = makeExercise(state, queue[i], { now: new Date(), audio, mic: !!state.profile.micAvailable, scaffold: scaffold.current, audioFirst: policy.audioFirst, kScale: policy.formatK });
       if (ex) return { ex, i };
     }
     return null;
-  }, [index, queue, state, audio]);
+  }, [index, queue, state, audio, policy]);
 
   useEffect(() => {
     shownAt.current = Date.now();
@@ -154,6 +161,15 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
     advance(q, i);
   }
 
+  /** "Too easy", "less pinyin"…: saved, and applied from the next exercise (difficulty at once). */
+  function adjust(patch: Partial<UserProfile>, c: Command) {
+    commitProfile(state, patch);
+    void db.profile.update('me', patch);
+    if (c.kind === 'difficulty') scaffold.current = Math.max(-2, Math.min(2, scaffold.current + c.delta));
+    configureSpeech(state.profile.voiceURI, state.profile.ttsRate);
+    setImmersion(state.profile.immersion);
+  }
+
   /** The reader saved the answers itself; log them for the summary and move on. */
   function storyDone(results: StoryResult[]) {
     if (!current) return;
@@ -191,6 +207,10 @@ export function Session({ state, minutes, audio, onExit }: { state: LearnerState
         ? <StoryView key={current.ex.slot.key} state={state} story={stories.find((st) => st.id === current.ex.slot.ref)!} audio={audio} sessionId={sessionId.current} onDone={storyDone} />
         : <ExerciseView key={current.ex.slot.key} ex={current.ex} audio={audio} result={result} onSubmit={submit} onContinue={next} onOverride={override} onAssist={assist} speaker={state.profile.speaker} onSpoken={spoken} stt={state.profile.privacy.stt}
         explain={aiOn ? () => ask(state.profile, explainRequest(current.ex, tutorContext(state), result ? { given, result } : undefined)) : undefined} />}
+      <details className="text-sm">
+        <summary className="cursor-pointer text-slate-500">Adjust: too easy, too hard, less pinyin…</summary>
+        <div className="mt-2"><CommandBox profile={state.profile} onPatch={adjust} /></div>
+      </details>
     </Screen>
   );
 }
@@ -224,7 +244,7 @@ function Summary({ log, state, introduced, at, minutes, onExit }: { log: Logged[
         </Card>
       )}
       {hours && <p className="text-center text-sm text-slate-500">Next review due in about {hours} hour{hours === 1 ? '' : 's'}.</p>}
-      <Button onClick={onExit} className="mt-auto py-4 text-lg">Done</Button>
+      <Button onClick={onExit} className="mt-auto py-4 text-lg">{t('Done')}</Button>
     </Screen>
   );
 }
